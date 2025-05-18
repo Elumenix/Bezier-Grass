@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -8,8 +9,9 @@ public class PlanetGenerator : MonoBehaviour
     private MeshRenderer meshRenderer;
     private MeshFilter meshFilter;
     private Mesh mesh;
+    private IcoSphere planetSphere;
     
-    [Range(0, 20)]
+    [Range(0, 10)]
     public int subDivisions;
 
     void Awake()
@@ -25,8 +27,22 @@ public class PlanetGenerator : MonoBehaviour
     
     void Start()
     {
+        planetSphere = new IcoSphere();
         GenerateMesh();
     }
+    
+
+    /*private void Update()
+    {
+        if (Time.frameCount == 100)
+        {
+            planetSphere = new IcoSphere();
+        }
+        else if (Time.frameCount == 160)
+        {
+            GenerateMesh();
+        }
+    }*/
 
     private void OnValidate()
     {
@@ -39,16 +55,17 @@ public class PlanetGenerator : MonoBehaviour
 
     private void GenerateMesh()
     {
-        IcoSphere icoSphere = new IcoSphere(subDivisions);
+        Debug.Log("Generating Sphere");
+        planetSphere.Subdivide(subDivisions);
 
         // Luckily this can be copied directly
-        Vector3[] vertices = icoSphere.Vertices.ToArray();
+        Vector3[] vertices = planetSphere.Vertices.ToArray();
 
-        int polygonCount = icoSphere.Polygons.Count;
+        int polygonCount = planetSphere.Polygons.Count;
         int[] indices = new int[polygonCount * 3];
         for (int i = 0; i < polygonCount; i++)
         {
-            IcoSphere.Polygon p = icoSphere.Polygons[i];
+            IcoSphere.Polygon p = planetSphere.Polygons[i];
             int baseIndex = i * 3;
 
             indices[baseIndex] = p.v1;
@@ -58,14 +75,18 @@ public class PlanetGenerator : MonoBehaviour
 
         mesh.Clear();
         mesh.indexFormat = IndexFormat.UInt32;
-        mesh.SetVertices(vertices, 0, vertices.Length, MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontRecalculateBounds);
-        mesh.SetNormals(vertices, 0, vertices.Length, MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontRecalculateBounds);
+        mesh.SetVertices(vertices, 0, vertices.Length, MeshUpdateFlags.DontValidateIndices | 
+                                                       MeshUpdateFlags.DontResetBoneBounds |
+                                                       MeshUpdateFlags.DontNotifyMeshUsers);
+        mesh.SetNormals(vertices, 0, vertices.Length, MeshUpdateFlags.DontValidateIndices | 
+                                                      MeshUpdateFlags.DontResetBoneBounds |
+                                                      MeshUpdateFlags.DontNotifyMeshUsers);
         mesh.triangles = indices;
-        
-        Debug.Log(vertices.Length + "   " + indices.Length);
         
         // Optimizations
         mesh.RecalculateBounds();
         //mesh.Optimize(); // This might be bad if I do LOD (Which I probably will)
+        
+        Debug.Log("Faces: " + polygonCount + "     Vertices: " + vertices.Length + "     Indices: " + indices.Length);
     }
 }

@@ -15,23 +15,74 @@ public class IcoSphere
         }
     }
     
-    // Variables
-    public List<Polygon> Polygons { get; private set; }
-    public List<Vector3> Vertices { get; private set; }
-
-
-    public IcoSphere(int subDivisions)
+    // Believe it or not, Adding to a dictionary takes over 80% of the time spent in this class once you get to 6 Divisions
+    // Making a custom key that's much faster to check is the biggest optimization in this class
+    private readonly struct EdgeKey : System.IEquatable<EdgeKey>
     {
-        Initialize(subDivisions);
+        private readonly int A;
+        private readonly int B;
+
+        public EdgeKey(int a, int b)
+        {
+            if (a < b)
+            {
+                A = a;
+                B = b;
+            }
+            else
+            {
+                A = b;
+                B = a;
+            }
+        }
+
+        public bool Equals(EdgeKey other) => A == other.A && B == other.B;
+
+        public override bool Equals(object obj) => obj is EdgeKey other && Equals(other);
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + A;
+                hash = hash * 31 + B;
+                return hash;
+            }
+        }
     }
     
-    private void Initialize(int subDivisions)
-    {
-        // Essentially (10 * 4^x) + 2 : This is the exact number of expected vertices for this many subdivisions
-        int capacity = 10 * (1 << (2 * subDivisions)) + 2;
-        Vertices = new List<Vector3>(capacity);
-        Polygons = new List<Polygon>();
+    // Variables
+    public List<Vector3> Vertices { get; private set; }
+    public List<Polygon> Polygons { get; private set; }
+    private List<Polygon> nextPolygons;
+    private List<Polygon> basePolygons;
+    private Dictionary<EdgeKey, int>[] midPointCaches;
+    private const int maxSubDivisions = 10;
 
+
+    public IcoSphere()
+    {
+        
+        Initialize();
+    }
+    
+    private void Initialize()
+    {
+        // This is the exact number of expected vertices and indices for this many subdivisions
+        // The main goal here is to preallocate and save memory, otherwise the garbage collector will tank performance
+        Vertices = new List<Vector3>(10 * (1 << (2 * maxSubDivisions)) + 2); // (10 * 4^x) + 2
+        Polygons = new List<Polygon>(60 * (1 << (2 * maxSubDivisions))); // 60 * 4^x
+        basePolygons = new List<Polygon>(20);
+        nextPolygons = new List<Polygon>(Polygons.Capacity);
+        midPointCaches = new Dictionary<EdgeKey, int>[maxSubDivisions];
+        for (int i = 0; i < 10; i++)
+        {
+            // These are essentially the possible number of edges for each division, there can't be more midpoints than that
+            midPointCaches[i] = new Dictionary<EdgeKey, int>(30 * (1 << (2 * i))); // 30 * 4^x
+        }
+        
+        
         float t = (1.0f + Mathf.Sqrt(5.0f)) / 2.0f;
         
         // 12 vertices of base icosahedron
@@ -52,7 +103,7 @@ public class IcoSphere
         });
         
         // 20 faces of base icosahedron
-        Polygons.AddRange(new []
+        basePolygons.AddRange(new []
         {
             new Polygon(0, 11, 5),
             new Polygon(0, 5, 1),
@@ -75,35 +126,36 @@ public class IcoSphere
             new Polygon(8, 6, 7),
             new Polygon(9, 8, 1)
         });
-        
-        Subdivide(subDivisions);
     }
     
-    private void Subdivide(int subDivisions)
+    public void Subdivide(int subDivisions)
     {
+        if (subDivisions is < 0 or > maxSubDivisions) throw new System.ArgumentOutOfRangeException(nameof(subDivisions));
         
-
+        // Back to initialized data : Clearing data without deallocating memory
+        Vertices.RemoveRange(12, Vertices.Count - 12);
+        Polygons.Clear();
+        nextPolygons.Clear();
+        Polygons.AddRange(basePolygons.GetRange(0, 20));
+        
         for (int i = 0; i < subDivisions; i++)
         {
+            // Empty the cache without deallocating memory
+            var cache = midPointCaches[i];
+            cache.Clear();
+
             int n = Polygons.Count;
-            
-            // Only Polygons (indices) are being directly replaced. Vertices are being added and saved to the list as we find midPoints
-            List<Polygon> newPolygons = new List<Polygon>(Polygons.Count * 4);
-            
-            // Create map to save midPoints so that I don't keep reusing them, Unique to this level
-            Dictionary<long, int> midPointMap = new Dictionary<long, int>(Polygons.Count * 3);
-            
             for (int j = 0; j < n; j++)
             {
                 Polygon p = Polygons[j];
                 
                 // Find midpoints between all vertices to create new triangles
-                int ab = GetMidPoint(p.v1, p.v2, midPointMap);
-                int bc = GetMidPoint(p.v2, p.v3, midPointMap);
-                int ca = GetMidPoint(p.v3, p.v1, midPointMap);
+                int ab = GetMidPoint(p.v1, p.v2, cache);
+                int bc = GetMidPoint(p.v2, p.v3, cache);
+                int ca = GetMidPoint(p.v3, p.v1, cache);
 
                 // Create four new polygons from these vertices
-                newPolygons.AddRange(new []
+                nextPolygons.AddRange(new []
                 {
                     new Polygon(p.v1, ab, ca), 
                     new Polygon(p.v2, bc, ab),
@@ -113,34 +165,30 @@ public class IcoSphere
             }
             
             // Replace old polygons with subdivided ones. For either next recursion or reading indices
-            Polygons = newPolygons;
+            (Polygons, nextPolygons) = (nextPolygons, Polygons);
+            nextPolygons.Clear();
         }
     }
 
-    private int GetMidPoint(int a, int b, Dictionary<long, int> midPointMap)
+    private int GetMidPoint(int a, int b, Dictionary<EdgeKey, int> cache)
     {
-        // Create a key using the larger and smaller index
-        int smallerIndex = Mathf.Min(a, b);
-        int greaterIndex = Mathf.Max(a, b);
-        long key = ((long)smallerIndex << 32) + greaterIndex;
+        EdgeKey key = new EdgeKey(a, b);
 
         // If the key has already been seen, the midpoint is already in the list
-        if (midPointMap.TryGetValue(key, out int ret))
+        if (cache.TryGetValue(key, out int ret))
         {
             return ret;
         }
         
         // Find the midPoint
-        Vector3 p1 = Vertices[a];
-        Vector3 p2 = Vertices[b];
-        Vector3 middle = (p1 + p2).normalized;
+        Vector3 middle = (Vertices[a] + Vertices[b]).normalized;
 
         // MidPoint will be on the end of the vertex list
         ret = Vertices.Count;
         Vertices.Add(middle);
         
         // Make sure a key points to the midpoint
-        midPointMap.Add(key, ret);
+        cache.Add(key, ret);
         return ret;
     }
 }
