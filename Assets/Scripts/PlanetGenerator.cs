@@ -1,6 +1,6 @@
-using System;
 using UnityEngine;
 using UnityEngine.Rendering;
+using static PlanetStructs;
 
 [ExecuteInEditMode]
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
@@ -65,7 +65,7 @@ public class PlanetGenerator : MonoBehaviour
         int[] indices = new int[polygonCount * 3];
         for (int i = 0; i < polygonCount; i++)
         {
-            IcoSphere.Polygon p = planetSphere.Polygons[i];
+            Polygon p = planetSphere.Polygons[i];
             int baseIndex = i * 3;
 
             indices[baseIndex] = p.v1;
