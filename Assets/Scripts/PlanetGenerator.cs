@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using static PlanetStructs;
 
-[ExecuteInEditMode]
+//[ExecuteInEditMode]
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class PlanetGenerator : MonoBehaviour
 {
@@ -10,9 +10,9 @@ public class PlanetGenerator : MonoBehaviour
     private MeshFilter meshFilter;
     private Mesh mesh;
     private IcoSphere planetSphere;
+    public float radius = 100.0f;
+    public float lodDetail = 1.0f;
     
-    [Range(0, 10)]
-    public int subDivisions;
 
     void Awake()
     {
@@ -27,51 +27,24 @@ public class PlanetGenerator : MonoBehaviour
     
     void Start()
     {
-        planetSphere = new IcoSphere();
+        planetSphere = new IcoSphere(gameObject);
         GenerateMesh();
     }
     
 
-    /*private void Update()
+    private void Update()
     {
-        if (Time.frameCount == 100)
-        {
-            planetSphere = new IcoSphere();
-        }
-        else if (Time.frameCount == 160)
-        {
-            GenerateMesh();
-        }
-    }*/
-
-    private void OnValidate()
-    {
-        // This will break things if it runs on the first frame
-        if (Time.frameCount > 1)
-        {
-            GenerateMesh();
-        }
+        GenerateMesh();
     }
 
     private void GenerateMesh()
     {
-        Debug.Log("Generating Sphere");
-        planetSphere.Subdivide(subDivisions);
+        planetSphere.GenerateIcosahedron(radius, lodDetail);
 
         // Luckily this can be copied directly
         Vector3[] vertices = planetSphere.Vertices.ToArray();
-
-        int polygonCount = planetSphere.Polygons.Count;
-        int[] indices = new int[polygonCount * 3];
-        for (int i = 0; i < polygonCount; i++)
-        {
-            Polygon p = planetSphere.Polygons[i];
-            int baseIndex = i * 3;
-
-            indices[baseIndex] = p.v1;
-            indices[baseIndex + 1] = p.v2;
-            indices[baseIndex + 2] = p.v3;
-        }
+        int[] indices = planetSphere.Indices.ToArray();
+        
 
         mesh.Clear();
         mesh.indexFormat = IndexFormat.UInt32;
@@ -86,7 +59,5 @@ public class PlanetGenerator : MonoBehaviour
         // Optimizations
         mesh.RecalculateBounds();
         //mesh.Optimize(); // This might be bad if I do LOD (Which I probably will)
-        
-        Debug.Log("Faces: " + polygonCount + "     Vertices: " + vertices.Length + "     Indices: " + indices.Length);
     }
 }
