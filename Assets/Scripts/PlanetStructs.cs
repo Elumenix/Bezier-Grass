@@ -3,6 +3,13 @@ using UnityEngine;
 
 public static class PlanetStructs
 {
+    [System.Serializable]
+    public struct LodThreshold
+    {
+        public float distance;
+        public int lod;
+    }
+
     public static Dictionary<int, float> detailLevelDistances = new Dictionary<int, float>()
     {
         {0, Mathf.Infinity},

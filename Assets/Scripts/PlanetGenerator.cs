@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static PlanetStructs;
@@ -11,9 +12,10 @@ public class PlanetGenerator : MonoBehaviour
     private Mesh mesh;
     private IcoSphere planetSphere;
     public float radius = 100.0f;
-    public float lodDetail = 1.0f;
     private Vector3 previousPosition;
-    private Transform camera;
+    private Transform cameraTransform;
+    public List<LodThreshold> LodThresholds;
+
     
 
     void Awake()
@@ -29,26 +31,25 @@ public class PlanetGenerator : MonoBehaviour
     
     void Start()
     {
-        planetSphere = new IcoSphere(gameObject);
-        camera = Camera.main.transform;
-        previousPosition = camera.position;
+        planetSphere = new IcoSphere(gameObject, LodThresholds);
+        cameraTransform = Camera.main!.transform;
+        previousPosition = cameraTransform.position;
         GenerateMesh();
     }
     
 
     private void Update()
     {
-        if (Vector3.Distance(camera.position, previousPosition) > 10)
+        if (Vector3.Distance(cameraTransform.position, previousPosition) > 10)
         {
-            Debug.Log("RAN");
-            previousPosition = camera.position;
+            previousPosition = cameraTransform.position;
             GenerateMesh();
         }
     }
 
     private void GenerateMesh()
     {
-        planetSphere.GenerateIcosahedron(radius, lodDetail);
+        planetSphere.GenerateIcosahedron(radius);
 
         // Luckily this can be copied directly
         Vector3[] vertices = planetSphere.Vertices.ToArray();

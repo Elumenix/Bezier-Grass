@@ -7,27 +7,25 @@ public class IcoSphere
     // Variables
     public List<Vector3> Vertices { get; private set; }
     public List<int> Indices { get; private set; }
-    private Dictionary<Vector3, int> Cache; // Holds midPoints
-    private GameObject Parent;
+    private readonly Dictionary<Vector3, int> Cache; // Holds midPoints
+    private readonly GameObject Parent;
     private float Radius = 1.0f;
-    private float LOD = 1.0f;
     private Vector3 CameraPos;
+    private readonly List<LodThreshold> Thresholds;
 
 
-    public IcoSphere(GameObject parent)
+    public IcoSphere(GameObject parent, List<LodThreshold> thresholds)
     {
         Parent = parent;
         Vertices = new List<Vector3>();
         Indices = new List<int>();
         Cache = new Dictionary<Vector3, int>();
-
-        //Initialize();
+        Thresholds = thresholds;
     }
-    public void GenerateIcosahedron(float radius, float lod)
+    public void GenerateIcosahedron(float radius)
     {
         Radius = radius;
-        LOD = lod;
-        CameraPos = Camera.main.transform.position;
+        CameraPos = Camera.main!.transform.position;
         
         // Clearing, but not deallocating, memory
         Vertices.Clear();
@@ -71,19 +69,12 @@ public class IcoSphere
             int i1 = initialTriangles[i];
             int i2 = initialTriangles[i + 1];
             int i3 = initialTriangles[i + 2];
-            Subdivide(i1, i2, i3, 1f, 0);
+            Subdivide(i1, i2, i3, 0);
         }
     }
     
-    private void Subdivide(int i1, int i2, int i3, float size, int depth)
+    private void Subdivide(int i1, int i2, int i3, int depth)
     {
-        // Make a triangle from the parent, further subdivision would be too small
-        if (size < .01f)
-        {
-            AddTriangle(i1, i2, i3);
-            return;
-        }
-        
         // Get normalized vertex positions from list
         Vector3 v1 = Vertices[i1].normalized;
         Vector3 v2 = Vertices[i2].normalized;
@@ -109,18 +100,28 @@ public class IcoSphere
         float d1 = Vector3.Distance(CameraPos, e1World);
         float d2 = Vector3.Distance(CameraPos, e2World);
         float d3 = Vector3.Distance(CameraPos, e3World);
-
-        // We're essentially checking if the camera is close enough to each midpoint that subdivision would be needed
-        float threshold = size * Radius * LOD;
-        bool edgeTest1 = d1 >= threshold;
-        bool edgeTest2 = d2 >= threshold;
-        bool edgeTest3 = d3 >= threshold;
         
-        // I always want a minimum of two subdivisions regardless of distance so that the sphere is more circular
-        if(depth < 2) {
-            edgeTest1 = false;
-            edgeTest2 = false;
-            edgeTest3 = false;
+        bool edgeTest1 = true;
+        bool edgeTest2 = true;
+        bool edgeTest3 = true;
+
+        // See if each edge needs to be subdivided further based on it's distance to the camera
+        for (int i = 0; i < Thresholds.Count; i++)
+        {
+            if (d1 < Thresholds[i].distance && depth < Thresholds[i].lod)
+            {
+                edgeTest1 = false;
+            }
+            
+            if (d2 < Thresholds[i].distance && depth < Thresholds[i].lod)
+            {
+                edgeTest2 = false;
+            }
+            
+            if (d3 < Thresholds[i].distance && depth < Thresholds[i].lod)
+            {
+                edgeTest3 = false;
+            }
         }
         
         // If all edges are beyond threshold, use original triangle
@@ -162,7 +163,7 @@ public class IcoSphere
 
                 // Subdivide further if not a degenerate triangle (rare but possible)
                 if (newI1 != newI2 && newI2 != newI3 && newI1 != newI3)
-                    Subdivide(newI1, newI2, newI3, size / 2, depth + 1);
+                    Subdivide(newI1, newI2, newI3, depth + 1);
             }
         }
     }
