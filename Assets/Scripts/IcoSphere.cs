@@ -7,6 +7,7 @@ public class IcoSphere
     // Variables
     public List<Vector3> Vertices { get; private set; }
     public List<int> Indices { get; private set; }
+    public List<Vector2> UVs { get; private set; }
     private readonly Dictionary<Vector3, int> Cache; // Holds midPoints
     private readonly GameObject Parent;
     private float Radius = 1.0f;
@@ -19,6 +20,7 @@ public class IcoSphere
         Parent = parent;
         Vertices = new List<Vector3>();
         Indices = new List<int>();
+        UVs = new List<Vector2>();
         Cache = new Dictionary<Vector3, int>();
         Thresholds = thresholds;
     }
@@ -30,6 +32,7 @@ public class IcoSphere
         // Clearing, but not deallocating, memory
         Vertices.Clear();
         Indices.Clear();
+        UVs.Clear();
         Cache.Clear();
         
         // Golden ration creates icosahedron proportions
@@ -178,6 +181,14 @@ public class IcoSphere
         
         int newIndex = Vertices.Count;
         Vertices.Add(scaledVertex);
+        
+        // UV's that go across the edge of the texture don't work because the triangles aren't aligned to it.
+        // TODO: Figure out something to do about this later
+        Vector3 vert = vertex.normalized;
+        float u = 1.0f - (0.5f + Mathf.Atan2(vert.z, vert.x) / (2 * Mathf.PI));        
+        float v = 1.0f - (0.5f - Mathf.Asin(vert.y) / Mathf.PI); 
+        UVs.Add(new Vector2(u, v));
+        
         Cache.Add(scaledVertex, newIndex);
         return newIndex;
     }

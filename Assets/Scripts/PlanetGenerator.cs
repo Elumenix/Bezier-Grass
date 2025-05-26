@@ -26,7 +26,10 @@ public class PlanetGenerator : MonoBehaviour
         meshFilter.mesh = new Mesh();
         mesh = meshFilter.sharedMesh;
         mesh.name = "PlanetMesh";
-        meshRenderer.sharedMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        if (meshRenderer.sharedMaterial == null)
+        {
+            meshRenderer.sharedMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        }
     }
     
     void Start()
@@ -54,6 +57,7 @@ public class PlanetGenerator : MonoBehaviour
         // Luckily this can be copied directly
         Vector3[] vertices = planetSphere.Vertices.ToArray();
         int[] indices = planetSphere.Indices.ToArray();
+        Vector2[] uvs = planetSphere.UVs.ToArray();
         
 
         mesh.Clear();
@@ -64,7 +68,11 @@ public class PlanetGenerator : MonoBehaviour
         mesh.SetNormals(vertices, 0, vertices.Length, MeshUpdateFlags.DontValidateIndices | 
                                                       MeshUpdateFlags.DontResetBoneBounds |
                                                       MeshUpdateFlags.DontNotifyMeshUsers);
+        mesh.SetUVs(0, uvs, 0, uvs.Length, MeshUpdateFlags.DontValidateIndices | 
+                                           MeshUpdateFlags.DontResetBoneBounds |
+                                           MeshUpdateFlags.DontNotifyMeshUsers);
         mesh.triangles = indices;
+        
         
         // Optimizations
         mesh.RecalculateBounds();
