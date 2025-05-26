@@ -28,11 +28,13 @@ public class IcoSphere
         Radius = radius;
         LOD = lod;
         CameraPos = Camera.main.transform.position;
+        
         // Clearing, but not deallocating, memory
         Vertices.Clear();
         Indices.Clear();
         Cache.Clear();
         
+        // Golden ration creates icosahedron proportions
         float t = (1f + Mathf.Sqrt(5f)) / 2f;
         Vector3[] initialVertices = new []
         {
@@ -69,18 +71,20 @@ public class IcoSphere
             int i1 = initialTriangles[i];
             int i2 = initialTriangles[i + 1];
             int i3 = initialTriangles[i + 2];
-            Subdivide(i1, i2, i3, 1f);
+            Subdivide(i1, i2, i3, 1f, 0);
         }
     }
     
-    private void Subdivide(int i1, int i2, int i3, float size)
+    private void Subdivide(int i1, int i2, int i3, float size, int depth)
     {
+        // Make a triangle from the parent, further subdivision would be too small
         if (size < .01f)
         {
             AddTriangle(i1, i2, i3);
             return;
         }
         
+        // Get normalized vertex positions from list
         Vector3 v1 = Vertices[i1].normalized;
         Vector3 v2 = Vertices[i2].normalized;
         Vector3 v3 = Vertices[i3].normalized;
@@ -90,61 +94,81 @@ public class IcoSphere
         Vector3 m2 = (v2 + v3).normalized;
         Vector3 m3 = (v3 + v1).normalized;
         
-        // Get or Make associated indices
+        // Add/cache midpoints and get their indices
         int i4 = AddVertex(m1);
         int i5 = AddVertex(m2);
         int i6 = AddVertex(m3);
+        
         
         // Get the vertices in world space so that distances may be calculated
         Vector3 e1World = Parent.transform.TransformPoint(m1 * Radius);
         Vector3 e2World = Parent.transform.TransformPoint(m2 * Radius);
         Vector3 e3World = Parent.transform.TransformPoint(m3 * Radius);
 
-
+        // Camera distance to midpoints
         float d1 = Vector3.Distance(CameraPos, e1World);
         float d2 = Vector3.Distance(CameraPos, e2World);
         float d3 = Vector3.Distance(CameraPos, e3World);
 
+        // We're essentially checking if the camera is close enough to each midpoint that subdivision would be needed
         float threshold = size * Radius * LOD;
-
         bool edgeTest1 = d1 >= threshold;
         bool edgeTest2 = d2 >= threshold;
         bool edgeTest3 = d3 >= threshold;
         
+        // I always want a minimum of two subdivisions regardless of distance so that the sphere is more circular
+        if(depth < 2) {
+            edgeTest1 = false;
+            edgeTest2 = false;
+            edgeTest3 = false;
+        }
         
-        // If a distance doesn't reach a threshold, make a triangle
+        // If all edges are beyond threshold, use original triangle
         if (edgeTest1 && edgeTest2 && edgeTest3)
         {
             AddTriangle(i1, i2, i3);
             return;
         }
         
-        
+        // New triangle configuration after subdivision if all edge tests were to pass (4 triangles from subdivision)
+        //        i1
+        //       / \
+        //     i4---i6
+        //    /  \ / \  
+        //   i2--i5--i3
         int[] newIndices = { i1, i4, i6, i6, i4, i5, i4, i2, i5, i6, i5, i3 };
 
+        // If an edge is too far away for subdivision to be necessary, we skip the midpoint and use the full edge
+        // This method allows for seamless transition between triangles
         if (edgeTest1)
             ReplaceIndices(ref newIndices, i4, i1);
         if (edgeTest2)
             ReplaceIndices(ref newIndices, i5, i2);
         if (edgeTest3)
             ReplaceIndices(ref newIndices, i6, i3);
-
+        
+        // Which triangles midpoints weren't replaced. Center triangle is always kept to maintain transition
         bool[] valid = { !edgeTest1, true, !edgeTest2, !edgeTest3 };
 
+        // If an edge was successful, that is now a parent triangle
         for (int i = 0; i < 4; i++)
         {
             if (valid[i])
             {
+                // Get vertices for new parent triangle
                 int newI1 = newIndices[i * 3];
                 int newI2 = newIndices[i * 3 + 1];
                 int newI3 = newIndices[i * 3 + 2];
 
+                // Subdivide further if not a degenerate triangle (rare but possible)
                 if (newI1 != newI2 && newI2 != newI3 && newI1 != newI3)
-                    Subdivide(newI1, newI2, newI3, size / 2);
+                    Subdivide(newI1, newI2, newI3, size / 2, depth + 1);
             }
         }
     }
     
+    // What the cache does here is prevent the same vertex being put in the vertices list multiple times
+    // which can happen because triangles share edges. This is a problem that needs to be dealt with regardless of implementation
     private int AddVertex(Vector3 vertex)
     {
         Vector3 scaledVertex = vertex * Radius;

@@ -12,6 +12,8 @@ public class PlanetGenerator : MonoBehaviour
     private IcoSphere planetSphere;
     public float radius = 100.0f;
     public float lodDetail = 1.0f;
+    private Vector3 previousPosition;
+    private Transform camera;
     
 
     void Awake()
@@ -28,13 +30,20 @@ public class PlanetGenerator : MonoBehaviour
     void Start()
     {
         planetSphere = new IcoSphere(gameObject);
+        camera = Camera.main.transform;
+        previousPosition = camera.position;
         GenerateMesh();
     }
     
 
     private void Update()
     {
-        GenerateMesh();
+        if (Vector3.Distance(camera.position, previousPosition) > 10)
+        {
+            Debug.Log("RAN");
+            previousPosition = camera.position;
+            GenerateMesh();
+        }
     }
 
     private void GenerateMesh()
