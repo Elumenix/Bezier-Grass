@@ -6,6 +6,12 @@ Texture2D _BlueNoiseTexture;
 SamplerState sampler_BlueNoiseTexture;
 int dimensions;
 
+// Let the compiler optimize this innately
+static const int2 neighborOffsets[9] = {
+    int2(-1, 1),  int2(0, 1),  int2(1, 1),   // Top row
+    int2(-1, 0),  int2(0, 0),  int2(1, 0),   // Middle row
+    int2(-1, -1), int2(0, -1), int2(1, -1)   // Bottom row
+};
 
 
 float4x4 QuatToMatrix(float4 q)
@@ -27,13 +33,54 @@ float4x4 MakeTRSMatrix(float3 pos, float4 rotQuat, float3 scale)
     return mul(trPart, transpose(rotPart));
 }
 
+
+float2 getJitteredPoint(int2 gridPos)
+{
+    // Sampling center of the pixel to prevent any edge clamping issues
+    float2 uv = (float2(gridPos) + 0.5) / 32.0;
+
+    // Texture wraps, so we don't need to worry about being out of bounds
+    float2 jitter = _BlueNoiseTexture.SampleLevel(sampler_BlueNoiseTexture, uv, 0).rg;
+    return float2(gridPos) + jitter;
+}
+
+float getSquaredDistance(float2 point1, float2 point2)
+{
+    float2 diff = point2 - point1;
+    return dot(diff, diff); 
+}
+
 [numthreads(32,1,32)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    uint2 pixel = id.xz % 32; // or some other offset
-    float2 uv = (float2(pixel) + 0.5) / 32; // Sampling center to prevent any edge clamping issues
-    float2 jitter = _BlueNoiseTexture.SampleLevel(sampler_BlueNoiseTexture, uv, 0).rg;
+    float2 queryPoint = float2(id.xz);
+    float2 bestPoint;
+    float minDistance = 1e30f; // Large initial value
+
     
-    float4x4 trs = MakeTRSMatrix(float3(id.x + jitter.x, 1, id.z + jitter.y), float4(0, 0, 0.7071068, 0.7071068), float3(1,1,1));
+    // Check all neighboring cells to find the closest jittered point
+    // Unroll should make this branchless at compile time
+    [unroll]
+    for (int i = 0; i < 9; i++)
+    {
+        int2 neighbor = int2(id.xz) + neighborOffsets[i];
+        float2 jitteredPoint = getJitteredPoint(neighbor);
+        
+        // Calculate distance from our query point to the jittered point
+        float distance = getSquaredDistance(queryPoint, jitteredPoint);
+        
+        if (distance < minDistance)
+        {
+            minDistance = distance;
+            bestPoint = jitteredPoint;
+        }
+    }
+    
+    
+
+    //float2 uv = (float2(pixel) + 0.5) / 32; // Sampling center to prevent any edge clamping issues
+    //float2 jitter = _BlueNoiseTexture.SampleLevel(sampler_BlueNoiseTexture, uv, 0).rg;
+    
+    float4x4 trs = MakeTRSMatrix(float3(bestPoint.x, 1, bestPoint.y), float4(0, 0, -0.7071068, -0.7071068), float3(1,1,1));
     grassTransforms[id.x * 32 + id.z] = trs;
 }
