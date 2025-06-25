@@ -2,12 +2,14 @@ using System;
 using System.Drawing;
 using Unity.Mathematics;
 using UnityEngine;
+using Color = UnityEngine.Color;
 
 public class GrassManager : MonoBehaviour
 {
     public ComputeShader grassPositionComputeShader;
     public Mesh grassMesh;
     public Material grassMaterial;
+    public Texture2D noiseTexture;
     private Matrix4x4[] matrices;
     private int grassDimensions = 32;
     private const int grassBlades = 1024;
@@ -55,11 +57,27 @@ public class GrassManager : MonoBehaviour
         }
         
         grassPositionComputeShader.SetBuffer(0, "grassTransforms", grassBuffer);
+        grassPositionComputeShader.SetTexture(0, "_BlueNoiseTexture", noiseTexture);
+        
         grassPositionComputeShader.SetInt("dimensions", grassDimensions);
         
         grassPositionComputeShader.Dispatch(0, 1, 1, 1);
         grassBuffer.GetData(matrices);
         
-        Graphics.DrawMeshInstanced(grassMesh, 0, grassMaterial, matrices);
+        RenderParams rp = new RenderParams(grassMaterial);
+        Graphics.RenderMeshInstanced(rp, grassMesh, 0, matrices);
+    }
+
+    private void OnDrawGizmos()
+    {
+        Gizmos.color = Color.red;
+        for (int i = 0; i <= grassDimensions; i++)
+        {
+            Gizmos.DrawLine(new Vector3(i, 0, 0), new Vector3(i, 0, grassDimensions));
+            Gizmos.DrawLine(new Vector3(0, 0, i), new Vector3(grassDimensions, 0, i));
+            
+            /*Gizmos.DrawLine(new Vector3(i * .5f, 0, 0), new Vector3(i * .5f, 0, grassDimensions));
+            Gizmos.DrawLine(new Vector3(0, 0, i * .5f), new Vector3(grassDimensions, 0, i * .5f));*/
+        }
     }
 }

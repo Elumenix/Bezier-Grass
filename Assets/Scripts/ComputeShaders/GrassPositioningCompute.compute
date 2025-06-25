@@ -2,7 +2,11 @@
 #pragma kernel CSMain
 
 RWStructuredBuffer<float4x4> grassTransforms;
+Texture2D _BlueNoiseTexture;
+SamplerState sampler_BlueNoiseTexture;
 int dimensions;
+
+
 
 float4x4 QuatToMatrix(float4 q)
 {
@@ -26,6 +30,10 @@ float4x4 MakeTRSMatrix(float3 pos, float4 rotQuat, float3 scale)
 [numthreads(32,1,32)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    float4x4 trs = MakeTRSMatrix(float3(id.x * 2, 0, id.z * 2), float4(0, 0, 0.7071068, 0.7071068), float3(1,1,1));
+    uint2 pixel = id.xz % 32; // or some other offset
+    float2 uv = (float2(pixel) + 0.5) / 32; // Sampling center to prevent any edge clamping issues
+    float2 jitter = _BlueNoiseTexture.SampleLevel(sampler_BlueNoiseTexture, uv, 0).rg;
+    
+    float4x4 trs = MakeTRSMatrix(float3(id.x + jitter.x, 1, id.z + jitter.y), float4(0, 0, 0.7071068, 0.7071068), float3(1,1,1));
     grassTransforms[id.x * 32 + id.z] = trs;
 }
