@@ -20,7 +20,7 @@ public class GrassManager : MonoBehaviour
     public int textureSize = 512;
     
     [Header("Output")]
-    [LargeTexturePreview, SerializeField]
+    [LargeTexturePreview(512f), SerializeField]
     private RenderTexture voronoiTexture; 
     public RenderTexture VoronoiTexture => voronoiTexture;
     
@@ -97,7 +97,7 @@ public class GrassManager : MonoBehaviour
         // Create RenderTexture
         if (voronoiTexture != null) voronoiTexture.Release();
         
-        voronoiTexture = new RenderTexture(textureSize, textureSize, 0, RenderTextureFormat.RFloat)
+        voronoiTexture = new RenderTexture(textureSize, textureSize, 0, RenderTextureFormat.Default)
             {
                 enableRandomWrite = true,
                 filterMode = FilterMode.Point,
