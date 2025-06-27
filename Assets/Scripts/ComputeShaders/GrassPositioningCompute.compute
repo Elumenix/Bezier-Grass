@@ -2,9 +2,14 @@
 #pragma kernel CSMain
 
 RWStructuredBuffer<float4x4> grassTransforms;
-Texture2D _BlueNoiseTexture;
+/*Texture2D _BlueNoiseTexture;
 SamplerState sampler_BlueNoiseTexture;
-int dimensions;
+Texture2D _VoronoiTexture;
+SamplerState sampler_VoronoiTexture;
+int dimensions;*/
+float scale;
+float grassDist;
+float3 startPosition;
 
 // Let the compiler optimize this innately
 static const int2 neighborOffsets[9] = {
@@ -34,7 +39,7 @@ float4x4 MakeTRSMatrix(float3 pos, float4 rotQuat, float3 scale)
 }
 
 
-float2 getJitteredPoint(int2 gridPos)
+/*float2 getJitteredPoint(int2 gridPos)
 {
     // Sampling center of the pixel to prevent any edge clamping issues
     float2 uv = (float2(gridPos) + 0.5) / 32.0;
@@ -48,12 +53,16 @@ float getSquaredDistance(float2 point1, float2 point2)
 {
     float2 diff = point2 - point1;
     return dot(diff, diff); 
+}*/
+
+float2 rand2(float2 p) {
+    return frac(sin(float2(dot(p, float2(127.1, 311.7)), dot(p, float2(269.5, 183.3)))) * 43758.5453);
 }
 
 [numthreads(32,1,32)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    float2 queryPoint = float2(id.xz);
+    /*float2 queryPoint = float2(id.xz);
     float2 bestPoint;
     float minDistance = 1e30f; // Large initial value
 
@@ -74,6 +83,48 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             minDistance = distance;
             bestPoint = jitteredPoint;
         }
+    }*/
+    //float2 uv = float2(id.xz);
+    //float2 bestPoint = id.xz + id.xz + _VoronoiTexture.SampleLevel(sampler_VoronoiTexture, uv + 0.5, 0).rr;
+
+    float2 pos = startPosition.xz + float2(id.xz) * grassDist + .5;
+    int _NumPoints = 10;
+    float2 uv = (pos  * _NumPoints) / scale;
+    float2 baseCell = floor(uv);
+    float minDistToCell = 10.0;
+    float2 closestCell;
+
+    [unroll]
+    for (int x = -1; x <= 1; x++)
+    {
+        [unroll]
+        for (int y = -1; y <= 1; y++)
+        {
+            float2 cell = baseCell + float2(x,y);
+
+            float2 wrappedCell = fmod(cell + _NumPoints, _NumPoints);
+                        
+            float2 cellPosition = wrappedCell + rand2(wrappedCell);
+            float2 diff = cellPosition - uv;
+
+
+            float2 wrappedDiff = diff;
+            if (abs(diff.x) > _NumPoints * 0.5) {
+                wrappedDiff.x = diff.x - sign(diff.x) * _NumPoints;
+            }
+            if (abs(diff.y) > _NumPoints * 0.5) {
+                wrappedDiff.y = diff.y - sign(diff.y) * _NumPoints;
+            }
+
+                        
+            float distToCell = length(wrappedDiff);
+
+            if (distToCell < minDistToCell)
+            {
+                minDistToCell = distToCell;
+                closestCell = wrappedCell;
+            }
+        }
     }
     
     
@@ -81,6 +132,11 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     //float2 uv = (float2(pixel) + 0.5) / 32; // Sampling center to prevent any edge clamping issues
     //float2 jitter = _BlueNoiseTexture.SampleLevel(sampler_BlueNoiseTexture, uv, 0).rg;
     
-    float4x4 trs = MakeTRSMatrix(float3(bestPoint.x, 1, bestPoint.y), float4(0, 0, -0.7071068, -0.7071068), float3(1,1,1));
+    float4x4 trs = MakeTRSMatrix(float3(pos.x, startPosition.y + 10, pos.y), float4(0, 0, -0.7071068, -0.7071068), float3(minDistToCell*10, minDistToCell*10, minDistToCell*10));
     grassTransforms[id.x * 32 + id.z] = trs;
+
+
+
+
+    
 }

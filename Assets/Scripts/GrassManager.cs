@@ -18,6 +18,7 @@ public class GrassManager : MonoBehaviour
     
     [Header("Settings")]
     public int textureSize = 512;
+    public float scale = 1;
     
     [Header("Output")]
     [LargeTexturePreview(512f), SerializeField]
@@ -63,7 +64,7 @@ public class GrassManager : MonoBehaviour
         Matrix4x4[] goodMatrices = new Matrix4x4[1024];
 
         
-        int i = 0;
+        /*int i = 0;
         for (int x = 0; x < grassDimensions; x++)
         {
             for (int z = 0; z < grassDimensions; z++)
@@ -72,12 +73,14 @@ public class GrassManager : MonoBehaviour
                     Quaternion.Euler(0,0,90), Vector3.one);
                 i++;
             }
-        }
+        }*/
         
         grassPositionComputeShader.SetBuffer(0, "grassTransforms", grassBuffer);
-        grassPositionComputeShader.SetTexture(0, "_BlueNoiseTexture", noiseTexture);
+        /*grassPositionComputeShader.SetTexture(0, "_BlueNoiseTexture", noiseTexture);
+        grassPositionComputeShader.SetTexture(0, "_VoronoiTexture", voronoiTexture);
         
-        grassPositionComputeShader.SetInt("dimensions", grassDimensions);
+        grassPositionComputeShader.SetInt("dimensions", grassDimensions);*/
+        grassPositionComputeShader.SetFloat("scale", scale);
         
         grassPositionComputeShader.Dispatch(0, 1, 1, 1);
         grassBuffer.GetData(matrices);

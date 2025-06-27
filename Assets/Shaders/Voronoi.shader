@@ -37,9 +37,7 @@ Shader "Custom/Voronoi"
             float2 rand2(float2 p) {
                 return frac(sin(float2(dot(p, float2(127.1, 311.7)), dot(p, float2(269.5, 183.3)))) * 43758.5453);
             }
-
-
-
+            
             Varyings Vertex(Attributes input)
             {
                 Varyings output;
@@ -53,6 +51,7 @@ Shader "Custom/Voronoi"
                 float2 uv = input.uv * _NumPoints;
                 float2 baseCell = floor(uv);
                 float minDistToCell = 10.0;
+                float2 closestCell;
 
                 [unroll]
                 for (int x = -1; x <= 1; x++)
@@ -82,10 +81,14 @@ Shader "Custom/Voronoi"
                         if (distToCell < minDistToCell)
                         {
                             minDistToCell = distToCell;
+                            closestCell = wrappedCell;
                         }
                     }
                 }
 
+                // for color
+                float random = rand2(closestCell);
+                //return random;
                 return minDistToCell;
             }
             ENDHLSL
