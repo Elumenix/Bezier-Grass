@@ -1,6 +1,7 @@
 using Unity.Mathematics;
 using UnityEngine;
-
+using UnityEngine.UIElements;
+using static Unity.Mathematics.math;
 
 struct GrassBlade
 {
@@ -19,6 +20,12 @@ public class GrassBladeTest : MonoBehaviour
     public float height = 3;
     public float tilt = 3;
     public float bend = 1;
+    
+    [Header("Bezier Point References")]
+    public GameObject p0;
+    public GameObject p1;
+    public GameObject p2;
+    public GameObject p3;
     
     private Mesh grassBladeData;
     private ComputeBuffer bladeBuffer;
@@ -78,20 +85,51 @@ public class GrassBladeTest : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        // This classes object is being used as position, as if it were a seed. We want the grass centered in the scene for testing
         GrassBlade blade = new GrassBlade()
         {
-            position = float3.zero,
+            position = this.transform.position,
             width = this.width,
             height = this.height,
             tilt = this.tilt,
             bend = this.bend,
-            nearestClumpPosition = float3.zero
+            nearestClumpPosition = Vector3.zero
         };
         bladeBuffer.SetData(new [] {blade});
         mpb.SetBuffer(BladeBuffer, bladeBuffer);
         rp.matProps = mpb;
         
         Graphics.RenderMeshInstanced(rp, grassBladeData, 0, instanceData);
+    }
+
+    
+    Vector2 rand2(Vector2 p) {
+        return frac(sin(float2(dot(p, float2(127.1f, 311.7f)), dot(p, float2(269.5f, 183.3f)))) * 43758.5453f);
+    }
+    
+    [ContextMenu("Reset Points based on Position/Width/Height")]
+    public void ResetPoints()
+    {
+        p0.transform.position = Vector2.zero;
+        
+        // randomness based off position of this classes object so that I can randomize while still centering the blade
+        Vector2 bladeHash2D = rand2(new Vector2(transform.position.x, transform.position.z));
+        bend = bladeHash2D.x < 0.05f ? 0.0f : .1f;
+        tilt = bladeHash2D.y;
+        Vector2 facing = normalize(bladeHash2D * 2.0f - Vector2.one); // Random values between 0 and 1
+
+        // Endpoint is based on height and tilt
+        p3.transform.position = p0.transform.position + new Vector3(facing.x, 0, facing.y) * tilt + Vector3.up * height;
+        
+        // Above the starting point. How long until bending starts a lot more
+        p1.transform.position = p0.transform.position + Vector3.up * (height * bend);
+
+        Vector3 midPoint = 0.5f * (p3.transform.position - p1.transform.position);
+        Vector3 widthDir = new Vector3(facing.y, 0, -facing.x);
+        Vector3 bladeDir = normalize(p3.transform.position - p1.transform.position);
+        Vector3 awayDir = cross(-widthDir, bladeDir);
+
+        p2.transform.position = (p0.transform.position + midPoint) + awayDir * bend;
     }
 
     /*private void OnDrawGizmos()
