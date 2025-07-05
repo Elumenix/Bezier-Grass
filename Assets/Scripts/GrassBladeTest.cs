@@ -1,3 +1,4 @@
+using System;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -13,6 +14,7 @@ struct GrassBlade
     public float3 nearestClumpPosition;
 };
 
+[ExecuteInEditMode]
 public class GrassBladeTest : MonoBehaviour
 {
     public Material bladeMaterial;
@@ -34,12 +36,19 @@ public class GrassBladeTest : MonoBehaviour
     private Matrix4x4[] instanceData;
     private Matrix4x4 t;
     private static readonly int BladeBuffer = Shader.PropertyToID("_BladeBuffer");
+    private static readonly int Hash = Shader.PropertyToID("hash");
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        InitializeData();
+    }
+
+    private void InitializeData()
+    {
         t = Matrix4x4.identity;
         instanceData = new[] {t};
+        bladeBuffer?.Release();
         bladeBuffer = new ComputeBuffer(1, sizeof(float) * 10);
         mpb = new MaterialPropertyBlock();
         rp = new RenderParams(bladeMaterial);
@@ -74,6 +83,7 @@ public class GrassBladeTest : MonoBehaviour
         {
             // Bounds needs to be centered on the blade and fit both it's height and width, otherwise it will cull early
             grassBladeData.bounds = new Bounds(new Vector3(0, height * 3.5f, 0), new Vector3(width, height * 7, width));
+            UpdatePoints();
         }
     }
 
@@ -82,9 +92,19 @@ public class GrassBladeTest : MonoBehaviour
         bladeBuffer?.Release();
     }
 
+    // Only needed because ExecuteInEditMode is used, so buffers need to be cleaned while quitting unity and entering playmode
+    private void OnDisable()
+    {
+        bladeBuffer?.Release();
+    }
+
     // Update is called once per frame
     void Update()
     {
+        if (bladeBuffer == null) InitializeData();
+        
+        Vector2 hash = rand2(new Vector2(transform.position.x, transform.position.z));
+        
         // This classes object is being used as position, as if it were a seed. We want the grass centered in the scene for testing
         GrassBlade blade = new GrassBlade()
         {
@@ -95,7 +115,9 @@ public class GrassBladeTest : MonoBehaviour
             bend = this.bend,
             nearestClumpPosition = Vector3.zero
         };
-        bladeBuffer.SetData(new [] {blade});
+        
+        bladeBuffer!.SetData(new [] {blade});
+        mpb.SetVector(Hash, hash);
         mpb.SetBuffer(BladeBuffer, bladeBuffer);
         rp.matProps = mpb;
         
@@ -124,9 +146,32 @@ public class GrassBladeTest : MonoBehaviour
         // Above the starting point. How long until bending starts a lot more
         p1.transform.position = p0.transform.position + Vector3.up * (height * bend);
 
-        Vector3 midPoint = 0.5f * (p3.transform.position - p1.transform.position);
+        Vector3 midPoint = 0.5f * (p3.transform.position - p0.transform.position);
         Vector3 widthDir = new Vector3(facing.y, 0, -facing.x);
-        Vector3 bladeDir = normalize(p3.transform.position - p1.transform.position);
+        Vector3 bladeDir = normalize(p3.transform.position - p0.transform.position);
+        Vector3 awayDir = cross(-widthDir, bladeDir);
+
+        p2.transform.position = (p0.transform.position + midPoint) + awayDir * bend;
+    }
+
+    // Doesn't move bend, tilt, height
+    private void UpdatePoints()
+    {
+        p0.transform.position = Vector2.zero;
+        
+        // randomness based off position of this classes object so that I can randomize while still centering the blade
+        Vector2 bladeHash2D = rand2(new Vector2(transform.position.x, transform.position.z));
+        Vector2 facing = normalize(bladeHash2D * 2.0f - Vector2.one); // Random values between 0 and 1
+
+        // Endpoint is based on height and tilt
+        p3.transform.position = p0.transform.position + new Vector3(facing.x, 0, facing.y) * tilt + Vector3.up * height;
+        
+        // Above the starting point. How long until bending starts a lot more
+        p1.transform.position = p0.transform.position + Vector3.up * (height * bend);
+
+        Vector3 midPoint = 0.5f * (p3.transform.position - p0.transform.position);
+        Vector3 widthDir = new Vector3(facing.y, 0, -facing.x);
+        Vector3 bladeDir = normalize(p3.transform.position - p0.transform.position);
         Vector3 awayDir = cross(-widthDir, bladeDir);
 
         p2.transform.position = (p0.transform.position + midPoint) + awayDir * bend;
