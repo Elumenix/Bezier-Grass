@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -22,6 +23,11 @@ public class GrassBladeTest : MonoBehaviour
     public float height = 3;
     public float tilt = 3;
     public float bend = 1;
+
+    [Header("ArcLengthParameterization")] 
+    public List<float> distribution = new List<float>(8){
+        0.0f, 0.16f, 0.27f, .37f, 0.5f, 0.67f, 0.85f, 1.0f
+    };
     
     [Header("Bezier Point References")]
     public GameObject p0;
@@ -31,12 +37,14 @@ public class GrassBladeTest : MonoBehaviour
     
     private Mesh grassBladeData;
     private ComputeBuffer bladeBuffer;
+    private ComputeBuffer arcLengthTBuffer;
     private RenderParams rp;
     private MaterialPropertyBlock mpb;
     private Matrix4x4[] instanceData;
     private Matrix4x4 t;
     private static readonly int BladeBuffer = Shader.PropertyToID("_BladeBuffer");
     private static readonly int Hash = Shader.PropertyToID("hash");
+    private static readonly int ArcLengthTBuffer = Shader.PropertyToID("_ArcLengthTBuffer");
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -50,13 +58,15 @@ public class GrassBladeTest : MonoBehaviour
         instanceData = new[] {t};
         bladeBuffer?.Release();
         bladeBuffer = new ComputeBuffer(1, sizeof(float) * 10);
+        arcLengthTBuffer?.Release();
+        arcLengthTBuffer = new ComputeBuffer(8, sizeof(float));
         mpb = new MaterialPropertyBlock();
         rp = new RenderParams(bladeMaterial);
         
         grassBladeData = new Mesh
         {
             vertices = new Vector3[15],
-            bounds = new Bounds(new Vector3(0, height * 3.5f, 0), new Vector3(width, height * 7, width))
+            bounds = new Bounds(new Vector3(0, height - height / 4, 0), new Vector3(2, height*1.5f, 2))
         };
         
         grassBladeData.SetIndices(new []
@@ -82,7 +92,7 @@ public class GrassBladeTest : MonoBehaviour
         if (grassBladeData != null)
         {
             // Bounds needs to be centered on the blade and fit both it's height and width, otherwise it will cull early
-            grassBladeData.bounds = new Bounds(new Vector3(0, height * 3.5f, 0), new Vector3(width, height * 7, width));
+            grassBladeData.bounds = new Bounds(new Vector3(0, height - height / 4, 0), new Vector3(2, height*1.5f, 2));
             UpdatePoints();
         }
     }
@@ -90,12 +100,14 @@ public class GrassBladeTest : MonoBehaviour
     private void OnApplicationQuit()
     {
         bladeBuffer?.Release();
+        arcLengthTBuffer?.Release();
     }
 
     // Only needed because ExecuteInEditMode is used, so buffers need to be cleaned while quitting unity and entering playmode
     private void OnDisable()
     {
         bladeBuffer?.Release();
+        arcLengthTBuffer?.Release();
     }
 
     // Update is called once per frame
@@ -117,8 +129,10 @@ public class GrassBladeTest : MonoBehaviour
         };
         
         bladeBuffer!.SetData(new [] {blade});
+        arcLengthTBuffer.SetData(distribution);
         mpb.SetVector(Hash, hash);
         mpb.SetBuffer(BladeBuffer, bladeBuffer);
+        mpb.SetBuffer(ArcLengthTBuffer, arcLengthTBuffer);
         rp.matProps = mpb;
         
         Graphics.RenderMeshInstanced(rp, grassBladeData, 0, instanceData);
@@ -180,6 +194,6 @@ public class GrassBladeTest : MonoBehaviour
     /*private void OnDrawGizmos()
     {
         Gizmos.color = Color.red;
-        Gizmos.DrawCube(new Vector3(0, height * 3.5f, 0), new Vector3(width, height * 7, width));
+        Gizmos.DrawCube(new Vector3(0, height - height / 4, 0), new Vector3(2, height*1.5f, 2));
     }*/
 }

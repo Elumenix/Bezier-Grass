@@ -23,6 +23,7 @@ Shader "Custom/GrassBladeTest"
             // We need something that will maintain precision between C# and HLSL, so we need to do this specifically here
             float2 hash;
             StructuredBuffer<GrassBlade> _BladeBuffer;
+            StructuredBuffer<float> _ArcLengthTBuffer;
             float windStrength;
             float swaying;
 
@@ -94,32 +95,28 @@ Shader "Custom/GrassBladeTest"
                     float speedMult = round(rawSpeedMult); // Force to integer multiples, confirms loop
                     float maxAmplitude = 0.01 * (windStrength + 3.0);
                     float timeMod = _Time[1] % (2.0 * acos(-1.0));
-                    p3 = p3 + sin(timeMod*speedMult + phaseOffset)*maxAmplitude*awayDir;
-                    p2 = p2 + sin(timeMod*speedMult + 1.57 + phaseOffset)*maxAmplitude/2.0*awayDir;
+                    p3 = p3 + sin(timeMod*speedMult + phaseOffset) * maxAmplitude * awayDir;
+                    p2 = p2 + sin(timeMod*speedMult + 1.57 + phaseOffset) * maxAmplitude / 2.0 * awayDir;
                 }
 
 
-                // STEP 3: Get the derivative (quadratic bezier curve) to normalize vertices positions on the curve
-                // Essentially arc length parameterization. Distance on a bezier curve isn't even, so we're mathmatically solving that
-
-                // Calculate quadratic bezier curve control points
-                float3 d0 = 3.0 * (p1 - p0);
-
-                // Precompute coefficients for fast position/derivative evaluation
-                float3 c0 = p0;
-                float3 c1 = d0;
-                float3 c2 = 3.0 * (p2 - p1) - d0;
-                float3 c3 = p3 - p0 - d0 - c2;
-
+                // STEP 3: Get the correct position for each vertex on the bezier curve
                 
-                uint vertex = input.vertexID;
-                float t = (vertex / 2) / 7.0; // Interpolated in pairs
-                t = sqrt(t);
-                float t2 = t * t;
-                float t3 = t * t2;
+                // compute coefficients for a more efficient bezier calculation
+                float3 c0 = p0;
+                float3 c1 = 3*(p1 - p0);
+                float3 c2 = 3*(p0 - 2*p1 + p2);
+                float3 c3 = p3 - 3*p2 + 3*p1 - p0;
 
-                // Position on cubic curve after arc-length normalization
-                float3 pos = c0 + c1 * t + c2 * t2 + c3 * t3;
+                // We're precomputing ArcT instead of doing an expensive arc length perameterization calculation in the vertex shader
+                // There's no closed form solution for arc length parameterization for cubic beziers, so this is much easier
+                uint vertex = input.vertexID;
+                float t = _ArcLengthTBuffer[vertex / 2];
+
+                // Get the correct point along the bezier curve
+                // float3 pos = c3t^3 + c2t^2 + c1t + c0
+                // float3 pos = ((c3 * t + c2) * t + c1) * t + c0;
+                float3 pos = mad(mad(mad(c3, t, c2), t, c1), t, c0);
                 
                 
                 // Blade will get skinnier the further up it goes, with point 14 (the last one) being along the center
@@ -133,7 +130,7 @@ Shader "Custom/GrassBladeTest"
 
             float3 Fragment(Varyings input) : SV_Target 
             {
-                if (input.vertexID == 0) return float3(1,1,1);
+                //if (input.vertexID == 0) return float3(1,1,1);
                 return float3(0,1,0);
             }
             ENDHLSL
