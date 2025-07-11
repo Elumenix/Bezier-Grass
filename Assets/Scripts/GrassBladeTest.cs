@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.UIElements;
 using static Unity.Mathematics.math;
 
@@ -62,11 +63,15 @@ public class GrassBladeTest : MonoBehaviour
         arcLengthTBuffer = new ComputeBuffer(8, sizeof(float));
         mpb = new MaterialPropertyBlock();
         rp = new RenderParams(bladeMaterial);
-        
+        /*{
+            receiveShadows = true,
+            shadowCastingMode = ShadowCastingMode.On
+        };*/
+
         grassBladeData = new Mesh
         {
             vertices = new Vector3[15],
-            bounds = new Bounds(new Vector3(0, height - height / 4, 0), new Vector3(2, height*1.5f, 2))
+            bounds = new Bounds(new Vector3(0, height - height / 4, 0), new Vector3(2, height*1.5f, 2)),
         };
         
         grassBladeData.SetIndices(new []
@@ -143,7 +148,7 @@ public class GrassBladeTest : MonoBehaviour
         return frac(sin(float2(dot(p, float2(127.1f, 311.7f)), dot(p, float2(269.5f, 183.3f)))) * 43758.5453f);
     }
     
-    [ContextMenu("Reset Points based on Position/Width/Height")]
+    [ContextMenu("Reset Points based on Position")]
     public void ResetPoints()
     {
         p0.transform.position = Vector2.zero;
