@@ -5,12 +5,14 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UIElements;
 using static Unity.Mathematics.math;
+using float2 = Unity.Mathematics.float2;
 
 struct GrassBlade
 {
     public float3 position;
     public float width;
     public float height;
+    public float2 facing;
     public float tilt;
     public float bend;
     public float3 nearestClumpPosition;
@@ -58,7 +60,7 @@ public class GrassBladeTest : MonoBehaviour
         t = Matrix4x4.identity;
         instanceData = new[] {t};
         bladeBuffer?.Release();
-        bladeBuffer = new ComputeBuffer(1, sizeof(float) * 10);
+        bladeBuffer = new ComputeBuffer(1, sizeof(float) * 12);
         arcLengthTBuffer?.Release();
         arcLengthTBuffer = new ComputeBuffer(8, sizeof(float));
         mpb = new MaterialPropertyBlock();
@@ -128,6 +130,7 @@ public class GrassBladeTest : MonoBehaviour
             position = this.transform.position,
             width = this.width,
             height = this.height,
+            facing = float2.zero,
             tilt = this.tilt,
             bend = this.bend,
             nearestClumpPosition = Vector3.zero

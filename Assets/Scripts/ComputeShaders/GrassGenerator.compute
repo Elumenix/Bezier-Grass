@@ -1,0 +1,77 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+#include "./Assets/Shaders/Includes/GrassBlade.cginc"
+
+
+// Our main goal here is to instantiate information 
+AppendStructuredBuffer<GrassBlade> grassBlades;
+float scale;
+float grassDist;
+float3 startPosition;
+
+float2 rand2(float2 p)
+{
+    return frac(sin(float2(dot(p, float2(127.1, 311.7)), dot(p, float2(269.5, 183.3)))) * 43758.5453);
+}
+
+[numthreads(32,1,32)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    // This doesn't quite line up, If I move to the middle, there's no garuntee of the same starting height
+    float2 gridPos = startPosition.xz + float2(id.xz) * grassDist + .5;
+    float3 worldPos = float3(gridPos.x, startPosition.y, gridPos.y);
+    float2 hash = rand2(gridPos);
+    
+    int _NumPoints = 10;
+    float2 uv = (gridPos  * _NumPoints) / scale;
+    float2 baseCell = floor(uv);
+    float minDistToCell = 10.0;
+    float2 closestCell;
+
+    
+    // Voronoi Noise Implementation
+    [unroll]
+    for (int x = -1; x <= 1; x++)
+    {
+        [unroll]
+        for (int y = -1; y <= 1; y++)
+        {
+            float2 cell = baseCell + float2(x,y);
+            float2 wrappedCell = fmod(cell + _NumPoints, _NumPoints);
+                        
+            float2 cellPosition = wrappedCell + rand2(wrappedCell);
+            float2 diff = cellPosition - uv;
+
+
+            float2 wrappedDiff = diff;
+            if (abs(diff.x) > _NumPoints * 0.5) {
+                wrappedDiff.x = diff.x - sign(diff.x) * _NumPoints;
+            }
+            if (abs(diff.y) > _NumPoints * 0.5) {
+                wrappedDiff.y = diff.y - sign(diff.y) * _NumPoints;
+            }
+
+            
+            float distToCell = length(wrappedDiff);
+            if (distToCell < minDistToCell)
+            {
+                minDistToCell = distToCell;
+                closestCell = wrappedCell;
+            }
+        }
+    }
+
+    
+    GrassBlade blade;
+    blade.position = worldPos;
+    blade.height = clamp(hash.y * 1.5f, .5, 1.5);
+    blade.nearestClumpPosition = float3(closestCell.x, 0, closestCell.y);
+    blade.facing = normalize(hash * 2.0f - 1); // Between -1 and 1
+    blade.width = -.05f;
+    blade.bend = .1f;
+    blade.tilt = hash.x;
+
+    
+    // Add this to the blades that will be rendered next frame
+    grassBlades.Append(blade);
+}
