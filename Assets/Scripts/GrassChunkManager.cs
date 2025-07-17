@@ -21,7 +21,6 @@ public class GrassChunkManager : MonoBehaviour
     //[SerializeField] private float grassDensity = 10f; // grass per square meter
     public ComputeShader grassComputeShader;
     private GraphicsBuffer highResIndexBuffer;
-    private GraphicsBuffer highResArcTBuffer;
     
     public float scale = 32;
     private float grassDist;
@@ -64,9 +63,8 @@ public class GrassChunkManager : MonoBehaviour
         highResIndexBuffer = new GraphicsBuffer(Target.Index, 39, sizeof(uint));
         highResIndexBuffer.SetData(indices);
         
-        float[] arcT = new[] { 0.001f, 0.33f, 0.49f, 0.62f, 0.73f, 0.38f, 0.92f, 1.0f };
-        highResArcTBuffer = new GraphicsBuffer(Target.Constant, 8, sizeof(float));
-        highResArcTBuffer.SetData(arcT);
+        float[] arcT = new[] { 0.001f, .001f, 0.33f, 0.49f, 0.62f, 0.73f, 0.38f, 0.92f, 1.0f };
+
         
         InitializeChunks();
     }
@@ -75,7 +73,6 @@ public class GrassChunkManager : MonoBehaviour
     {
         // Prevent memory problems
         highResIndexBuffer?.Release();
-        highResArcTBuffer?.Release();
     }
 
     void InitializeChunks()
@@ -153,8 +150,8 @@ public class GrassChunkManager : MonoBehaviour
         
         
         // TODO: LOD changes will need to happen somewhere around here
-        chunk.rp.matProps.SetConstantBuffer("_ArcLengthData", highResArcTBuffer, 0, highResArcTBuffer.count * sizeof(float));
         chunk.rp.matProps.SetBuffer(GrassBlades, chunk.grassBuffer);
+        chunk.rp.worldBounds = chunk.chunkBounds;
         Graphics.RenderPrimitivesIndexedIndirect(chunk.rp, MeshTopology.Triangles, highResIndexBuffer, chunk.commandBuffer);
     }
     

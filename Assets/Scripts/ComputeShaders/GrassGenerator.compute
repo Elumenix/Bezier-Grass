@@ -17,10 +17,9 @@ float2 rand2(float2 p)
 [numthreads(32,1,32)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    // This doesn't quite line up, If I move to the middle, there's no garuntee of the same starting height
+    // This doesn't quite line up, If I move to the middle, there's no guarantee of the same starting height
     float2 gridPos = startPosition.xz + float2(id.xz) * grassDist + .5;
     float3 worldPos = float3(gridPos.x, startPosition.y, gridPos.y);
-    float2 hash = rand2(gridPos);
     
     int _NumPoints = 10;
     float2 uv = (gridPos  * _NumPoints) / scale;
@@ -61,15 +60,31 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         }
     }
 
+
+    // Get a basic 2D hash
+    float2 hash2D = rand2(gridPos);
+
+    // Use the previous hash to create 4 more random values between 0 and 1 using bit shifting
+    uint hashX = asuint(hash2D.x);
+    uint hashY = asuint(hash2D.y);
+    float random1 = (hashX & 0xFF) / 255.0f;          // bits 0-7
+    float random2 = ((hashX >> 8) & 0xFF) / 255.0f;   // bits 8-15  
+    float random3 = ((hashX >> 16) & 0xFF) / 255.0f;  // bits 16-23
+    float random4 = ((hashX >> 24) & 0xFF) / 255.0f;  // bits 24-31
+    float random5 = (hashY & 0xFF) / 255.0f;          // bits 0-7
+    float random6 = ((hashY >> 8) & 0xFF) / 255.0f;   // bits 8-15  
+    float random7 = ((hashY >> 16) & 0xFF) / 255.0f;  // bits 16-23
+    float random8 = ((hashY >> 24) & 0xFF) / 255.0f;  // bits 24-31
+
     
     GrassBlade blade;
     blade.position = worldPos;
-    blade.height = clamp(hash.y * 1.5f, .5, 1.5);
+    blade.height = random1 * 4.5 + .5f;
     blade.nearestClumpPosition = float3(closestCell.x, 0, closestCell.y);
-    blade.facing = normalize(hash * 2.0f - 1); // Between -1 and 1
-    blade.width = -.05f;
-    blade.bend = .1f;
-    blade.tilt = hash.x;
+    blade.facing = normalize(hash2D * 2.0f - 1); // Between -1 and 1
+    blade.width = -.2f;
+    blade.bend = random2;
+    blade.tilt = random3;
 
     
     // Add this to the blades that will be rendered next frame

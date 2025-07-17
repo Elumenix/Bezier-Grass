@@ -16,12 +16,10 @@ Shader "Custom/Grass"
         // Data accessible in all passes
         HLSLINCLUDE
         #include "Includes/GrassBlade.cginc"
-        
+
+        // Fastest possible - no CPU-GPU transfer at all
+        static const float arcTBuffer[8] = { 0.001f, 0.33f, 0.49f, 0.62f, 0.73f, 0.83f, 0.92f, 1.0f };
         StructuredBuffer<GrassBlade> grassBlades;
-        cbuffer ArcLengthData {
-            float arcTBuffer[8];
-        }
-        
 
         // Hash will not be a part of the final implementation. Because we're testing control points on the cpu here,
         // We need something that will maintain precision between C# and HLSL, so we need to do this specifically here
@@ -78,9 +76,6 @@ Shader "Custom/Grass"
                 
                 // Root of the grass blade in object space
                 float3 p0 = float3(0,0,0);
-        
-                // randomness based off position of this classes object so that I can randomize while still centering the blade
-                //float2 bladeHash2D = rand2(blade.position.xz);
 
                 float2 facing2D = blade.facing;
                 float3 facing = float3(facing2D.x, 0, facing2D.y);
@@ -127,13 +122,15 @@ Shader "Custom/Grass"
                 // We're precomputing ArcT instead of doing an expensive arc length perameterization calculation in the vertex shader
                 // There's no closed form solution for arc length parameterization for cubic beziers, so this is much easier
                 uint vertex = input.vertexID;
-                //float t = arcTBuffer[vertex / 2];
-                float t = (vertex / 2) / 7;
+                float t = arcTBuffer[vertex / 2];
+
+                
 
                 // Get the correct point along the bezier curve
                 // float3 pos = c3t^3 + c2t^2 + c1t + c0
                 // float3 pos = ((c3 * t + c2) * t + c1) * t + c0;
                 float3 pos = mad(mad(mad(c3, t, c2), t, c1), t, c0);
+                //if (vertex == 4) pos = float3(0,arcTBuffer[5],0);
 
 
                 // STEP 4: Get the derivative of the cubic bezier curve in order to find the normals
@@ -158,10 +155,10 @@ Shader "Custom/Grass"
                 int odd = (vertex % 2) * 2 - 1; // -1 or 1
                 pos += widthDir * sideOffset * odd;
 
-                VertexPositionInputs positionInputs = GetVertexPositionInputs(pos);
+                float3 positionWS = TransformObjectToWorld(pos) + blade.position;
                 
-                o.positionCS = positionInputs.positionCS;
-                o.positionWS = positionInputs.positionWS;
+                o.positionCS = TransformWorldToHClip(positionWS);
+                o.positionWS = positionWS;
                 o.normalWS = TransformObjectToWorld(normalOS);
                 o.vertexID = vertex;
                 o.uv = float2(vertex == 14 ? .5 : vertex % 2, t);
@@ -184,6 +181,12 @@ Shader "Custom/Grass"
                 surfaceData.alpha = 1.0;
                 surfaceData.smoothness = 0.5;
                 surfaceData.specular = 0;
+
+                float t = input.vertexID / 15.0;
+                return float4(t,0,0, 1);
+
+                if (input.vertexID == 1) return float4(1,1,1,1);
+                else return float4(0,1,0,1);
                 
                 float3 color = UniversalFragmentBlinnPhong(lightData, surfaceData); //+ unity_AmbientSky;
                 return float4(color, 1.0);
