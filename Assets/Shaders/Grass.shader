@@ -2,6 +2,21 @@ Shader "Custom/Grass"
 {
     Properties
     {
+        [Header(Property Settings)]
+        _Color ("Color", Color) = (1,1,1,1)
+        _Glossiness ("Smoothness", Range(0,1.0)) = 0.5
+        _Specular ("Specular", Range(0,1.0)) = 0.0
+        _Occlusion ("Occlusion", Range(0,1.0)) = 1.0
+        
+        [Header(Subsurface Scattering)]
+        _Attenuation("Attenuation", Color) = (1,1,1,1)
+        _Distortion ("Normal Distortion", Range(0, 1.0)) = 0
+        _Concentration ("Concentration", Range(0.1, 10.0)) = 2.0
+        _Scale ("Scale", Range(0, 2.0)) = 0.5
+        _Ambient ("Ambient Factor", Range(0, 1.0)) = 0.2
+        _Thickness ("Thickness", Range(0.1, 10.0)) = 0.1
+        
+        [Header(Blade Behavior)]
         [Toggle] swaying ("Sway Blade", Float) = 0
         windStrength ("Wind Strength", Range(0.0, 5.0)) = 0.5
     }
@@ -21,8 +36,17 @@ Shader "Custom/Grass"
         static const float arcTBuffer[8] = { 0.001f, 0.33f, 0.49f, 0.62f, 0.73f, 0.83f, 0.92f, 1.0f };
         StructuredBuffer<GrassBlade> grassBlades;
 
-        // Hash will not be a part of the final implementation. Because we're testing control points on the cpu here,
-        // We need something that will maintain precision between C# and HLSL, so we need to do this specifically here
+
+        float4 _Color;
+        float4 _Attenuation;
+        float _Glossiness;
+        float _Specular;
+        float _Occlusion;
+        float _Distortion;
+        float _Concentration;
+        float _Scale;
+        float _Ambient;
+        float _Thickness;
         float windStrength;
         float swaying;
         
@@ -166,30 +190,53 @@ Shader "Custom/Grass"
 
             float4 Fragment(Varyings input) : SV_Target 
             {
+                //Light mainLight = GetMainLight();
+                float3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
+                //float3 lightDir = normalize(mainLight.direction);
+                float3 normalDirWS = normalize(input.normalWS);
+
+                // Subsurface scattering calculation
+                /*float3 distortedLightDir = normalize(lightDir + normalDirWS * _Distortion);
+                float backLight = saturate(dot(viewDirWS, -distortedLightDir));
+                float translucency = pow(backLight, _Concentration) * _Scale;
+                float3 lightIntensity = _Attenuation * (translucency + _Ambient) * _Thickness;*/
+
+                
+
+                // Because we're doing cull off and making the mesh double sided that way, we need to actually know wether
+                // we're looking at the front or back of the mesh currently so that the same lighting isn't used for both sides
+                float facing = dot(input.normalWS, viewDirWS);
+                if (facing < 0)
+                {
+                    normalDirWS = - normalDirWS;
+                }
+                
                 // Set data needed to calculate lighting
                 InputData lightData = (InputData)0;
                 lightData.positionWS = input.positionWS;
-                lightData.normalWS = normalize(input.normalWS);
-                lightData.viewDirectionWS = GetWorldSpaceViewDir(input.positionWS);
+                lightData.normalWS = normalDirWS;
+                lightData.viewDirectionWS = viewDirWS;
                 lightData.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
-                
+                lightData.bakedGI = SampleSH(lightData.normalWS); 
                 
                 // Surface data is for additional data from textures. 
                 SurfaceData surfaceData;
                 ZERO_INITIALIZE(SurfaceData, surfaceData);
-                surfaceData.albedo = float3(0.2,0.8,0.2); // Green
+                surfaceData.albedo = _Color.rgb;
                 surfaceData.alpha = 1.0;
-                surfaceData.smoothness = 0.5;
-                surfaceData.specular = 0;
+                surfaceData.smoothness = _Glossiness;
+                surfaceData.specular = _Specular;
+                surfaceData.occlusion = _Occlusion;
 
-                float t = input.vertexID / 15.0;
-                return float4(t,0,0, 1);
-
-                if (input.vertexID == 1) return float4(1,1,1,1);
-                else return float4(0,1,0,1);
                 
-                float3 color = UniversalFragmentBlinnPhong(lightData, surfaceData); //+ unity_AmbientSky;
-                return float4(color, 1.0);
+                // Apply PBR Lighting
+                float3 pbr = UniversalFragmentPBR(lightData, surfaceData);
+
+
+                //float3 finalColor = pbr.rgb + mainLight.color * lightIntensity;
+                
+                
+                return float4(pbr, 1);
             }
             ENDHLSL
         }

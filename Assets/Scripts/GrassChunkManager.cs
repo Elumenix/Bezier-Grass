@@ -7,6 +7,7 @@ using Unity.VisualScripting;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 using Matrix4x4 = UnityEngine.Matrix4x4;
+using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
 
 public class GrassChunkManager : MonoBehaviour
@@ -21,6 +22,7 @@ public class GrassChunkManager : MonoBehaviour
     //[SerializeField] private float grassDensity = 10f; // grass per square meter
     public ComputeShader grassComputeShader;
     private GraphicsBuffer highResIndexBuffer;
+    private GraphicsBuffer grassDesc;
     
     public float scale = 32;
     private float grassDist;
@@ -35,10 +37,13 @@ public class GrassChunkManager : MonoBehaviour
     private Vector2Int totalChunkCount;
     private Vector3 terrainPosition;
     private Vector3 terrainSize;
+
+    public GrassShape grassShape;
     
     // Camera reference
     private Camera mainCamera;
     private static readonly int GrassBlades = Shader.PropertyToID("grassBlades");
+    private static readonly int Shape = Shader.PropertyToID("GrassShape");
 
     void Start()
     {
@@ -63,7 +68,11 @@ public class GrassChunkManager : MonoBehaviour
         highResIndexBuffer = new GraphicsBuffer(Target.Index, 39, sizeof(uint));
         highResIndexBuffer.SetData(indices);
         
-        float[] arcT = new[] { 0.001f, .001f, 0.33f, 0.49f, 0.62f, 0.73f, 0.38f, 0.92f, 1.0f };
+        grassDesc = new GraphicsBuffer(Target.Constant, 1, sizeof(float) * 6);
+        grassDesc.SetData(new [] { grassShape });
+        
+        // This lasts for the life of the program, so it can be set now
+        grassComputeShader.SetConstantBuffer(Shape, grassDesc, 0, 32);
 
         
         InitializeChunks();
@@ -73,6 +82,14 @@ public class GrassChunkManager : MonoBehaviour
     {
         // Prevent memory problems
         highResIndexBuffer?.Release();
+        grassDesc?.Release();
+    }
+
+    private void OnValidate()
+    {
+        if (grassDesc == null) return;
+        grassDesc.SetData(new [] { grassShape });
+        grassComputeShader.SetConstantBuffer(Shape, grassDesc, 0, 32);
     }
 
     void InitializeChunks()
@@ -286,3 +303,12 @@ struct IndirectDrawIndexedArgs
     public uint baseVertexLocation;      // add to each index from index buffer
     public uint startInstanceLocation;   // add to SV_InstanceID
 }
+
+[Serializable]
+[StructLayout(LayoutKind.Sequential, Pack = 32)]
+public struct GrassShape
+{
+    public Vector2 height;
+    public Vector2 tilt;
+    public Vector2 bend;
+};

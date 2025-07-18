@@ -9,20 +9,38 @@ float scale;
 float grassDist;
 float3 startPosition;
 
+cbuffer GrassShape 
+{
+    float2 height;
+    float2 tilt;
+    float2 bend;
+    float2 padding;
+};
+
 float2 rand2(float2 p)
 {
     return frac(sin(float2(dot(p, float2(127.1, 311.7)), dot(p, float2(269.5, 183.3)))) * 43758.5453);
+}
+
+float pcg_float(uint input) {
+    uint state = input * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return float((word >> 22u) ^ word) * (1.0f / 4294967295.0f);
 }
 
 [numthreads(32,1,32)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
     // This doesn't quite line up, If I move to the middle, there's no guarantee of the same starting height
-    float2 gridPos = startPosition.xz + float2(id.xz) * grassDist + .5;
-    float3 worldPos = float3(gridPos.x, startPosition.y, gridPos.y);
+    // I'll need to find a solution to this later on so that it lines up with the terrain
     
+    float2 gridPos = startPosition.xz + float2(id.xz) * grassDist; 
+    float2 offsetPos = gridPos + rand2(gridPos) * grassDist; // Jitter point to prevent visible grid
+    float3 worldPos = float3(offsetPos.x, startPosition.y, offsetPos.y);
+
+    // Variables to set up the Voronoi Noise
     int _NumPoints = 10;
-    float2 uv = (gridPos  * _NumPoints) / scale;
+    float2 uv = (offsetPos  * _NumPoints) / scale;
     float2 baseCell = floor(uv);
     float minDistToCell = 10.0;
     float2 closestCell;
@@ -61,30 +79,24 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     }
 
 
-    // Get a basic 2D hash
-    float2 hash2D = rand2(gridPos);
-
-    // Use the previous hash to create 4 more random values between 0 and 1 using bit shifting
-    uint hashX = asuint(hash2D.x);
-    uint hashY = asuint(hash2D.y);
-    float random1 = (hashX & 0xFF) / 255.0f;          // bits 0-7
-    float random2 = ((hashX >> 8) & 0xFF) / 255.0f;   // bits 8-15  
-    float random3 = ((hashX >> 16) & 0xFF) / 255.0f;  // bits 16-23
-    float random4 = ((hashX >> 24) & 0xFF) / 255.0f;  // bits 24-31
-    float random5 = (hashY & 0xFF) / 255.0f;          // bits 0-7
-    float random6 = ((hashY >> 8) & 0xFF) / 255.0f;   // bits 8-15  
-    float random7 = ((hashY >> 16) & 0xFF) / 255.0f;  // bits 16-23
-    float random8 = ((hashY >> 24) & 0xFF) / 255.0f;  // bits 24-31
+    // Use pcg hashes (based on this grass blades position) to get multiple random numbers quickly
+    uint seed = worldPos.x + worldPos.z * 1000u;
+    float random1 = pcg_float(seed + 0u);
+    float random2 = pcg_float(seed + 1u);
+    float random3 = pcg_float(seed + 2u);
+    float random4 = pcg_float(seed + 3u);
+    float random5 = pcg_float(seed + 4u);
+    //float random6 = pcg_float(seed + 5u);
 
     
     GrassBlade blade;
     blade.position = worldPos;
-    blade.height = random1 * 4.5 + .5f;
+    blade.height = random1 * (height.y - height.x) + height.x;
     blade.nearestClumpPosition = float3(closestCell.x, 0, closestCell.y);
-    blade.facing = normalize(hash2D * 2.0f - 1); // Between -1 and 1
+    blade.facing = normalize(float2(random2, random3) * 2.0f - 1); // Between -1 and 1
     blade.width = -.2f;
-    blade.bend = random2;
-    blade.tilt = random3;
+    blade.tilt = random4 * (tilt.y - tilt.x) + tilt.x;
+    blade.bend = random5 * (bend.y - bend.x) + bend.x;
 
     
     // Add this to the blades that will be rendered next frame
