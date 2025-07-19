@@ -19,6 +19,7 @@ Shader "Custom/Grass"
         [Header(Blade Behavior)]
         [Toggle] swaying ("Sway Blade", Float) = 0
         windStrength ("Wind Strength", Range(0.0, 5.0)) = 0.5
+        _LodRange ("LOD Range", Vector) = (200, 500, 0, 0)
     }
     SubShader
     {
@@ -32,11 +33,12 @@ Shader "Custom/Grass"
         HLSLINCLUDE
         #include "Includes/GrassBlade.cginc"
 
-        // Fastest possible - no CPU-GPU transfer at all
+        // All data for grass shape is stored on the cpu for efficiency rather than needing to be passed every frame
+        // This also means that all instances of this shader share this data rather than every chunk/instance needing it's own version
         static const float arcTBuffer[8] = { 0.001f, 0.33f, 0.49f, 0.62f, 0.73f, 0.83f, 0.92f, 1.0f };
-        StructuredBuffer<GrassBlade> grassBlades;
-
-
+        static const float lodTBuffer[8] = { 0.001f, 0.001f, 0.001f, 0.5f, 0.8f, 1.0f, 1.0f, 1.0f };
+        StructuredBuffer<GrassBlade> grassBlades; // From the compute shader
+        
         float4 _Color;
         float4 _Attenuation;
         float _Glossiness;
@@ -49,6 +51,7 @@ Shader "Custom/Grass"
         float _Thickness;
         float windStrength;
         float swaying;
+        float2 _LodRange;
         
         ENDHLSL
 
@@ -143,11 +146,16 @@ Shader "Custom/Grass"
                 float3 c2 = 3 * (p0 - 2 * p1 + p2);    // t^2
                 float3 c3 = p3 - 3 * p2 + 3 * p1 - p0; // t^3
 
+                // We want to switch to a low detail grass blade if far away from the mesh. To make this seemless, we're
+                // stretching vertices towards the end of the grass blade so that it fades to a low detail mesh instead of instantly changing
+                float distanceToCamera = distance(blade.position, _WorldSpaceCameraPos);
+                float lodValue = saturate((distanceToCamera - _LodRange.x) / (_LodRange.y - _LodRange.x));
+
                 // We're precomputing ArcT instead of doing an expensive arc length perameterization calculation in the vertex shader
                 // There's no closed form solution for arc length parameterization for cubic beziers, so this is much easier
                 uint vertex = input.vertexID;
-                float t = arcTBuffer[vertex / 2];
-
+                uint pair = vertex / 2;
+                float t = lerp(arcTBuffer[pair], lodTBuffer[pair], lodValue);
                 
 
                 // Get the correct point along the bezier curve
@@ -175,7 +183,7 @@ Shader "Custom/Grass"
                 float3 normalOS = cross(tangentVec, widthDir);
                 
                 // Blade will get skinnier the further up it goes, with point 14 (the last one) being along the center
-                float sideOffset = blade.width - ((blade.width / 7.0) * (vertex / 2));
+                float sideOffset = blade.width - (blade.width * t * t);
                 int odd = (vertex % 2) * 2 - 1; // -1 or 1
                 pos += widthDir * sideOffset * odd;
 

@@ -19,12 +19,16 @@ Shader "Custom/GrassBladeTest"
         #include "Includes/GrassBlade.cginc"
         StructuredBuffer<GrassBlade> _BladeBuffer;
         StructuredBuffer<float> _ArcLengthTBuffer;
+        StructuredBuffer<float> _LodTBuffer;
 
         // Hash will not be a part of the final implementation. Because we're testing control points on the cpu here,
         // We need something that will maintain precision between C# and HLSL, so we need to do this specifically here
         float2 hash;
+        float LoDValue;
         float windStrength;
         float swaying;
+
+        
         
         ENDHLSL
 
@@ -137,6 +141,7 @@ Shader "Custom/GrassBladeTest"
                 // There's no closed form solution for arc length parameterization for cubic beziers, so this is much easier
                 uint vertex = input.vertexID;
                 float t = _ArcLengthTBuffer[vertex / 2];
+                t = lerp(t, _LodTBuffer[vertex / 2], LoDValue);
 
                 // Get the correct point along the bezier curve
                 // float3 pos = c3t^3 + c2t^2 + c1t + c0
@@ -163,7 +168,9 @@ Shader "Custom/GrassBladeTest"
                 float3 normalOS = cross(tangentVec, widthDir);
                 
                 // Blade will get skinnier the further up it goes, with point 14 (the last one) being along the center
-                float sideOffset = blade.width - ((blade.width / 7.0) * (vertex / 2));
+                //float sideOffset = blade.width - ((blade.width / 7.0) * (vertex / 2));
+                float sideOffset = blade.width - (blade.width * t*t);
+
                 int odd = (vertex % 2) * 2 - 1; // -1 or 1
                 pos += widthDir * sideOffset * odd;
 

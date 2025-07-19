@@ -26,10 +26,15 @@ public class GrassBladeTest : MonoBehaviour
     public float height = 3;
     public float tilt = 3;
     public float bend = 1;
+    [Range(0, 1)] public float LODValue = 0;
 
     [Header("ArcLengthParameterization")] 
     public List<float> distribution = new List<float>(8){
         0.0f, 0.16f, 0.27f, .37f, 0.5f, 0.67f, 0.85f, 1.0f
+    };
+    public List<float> lodDistribution = new List<float>(8)
+    {
+        0.001f, 0.001f, 0.001f, 0.45f, 0.85f, 1.0f, 1.0f, 1.0f
     };
     
     [Header("Bezier Point References")]
@@ -41,6 +46,7 @@ public class GrassBladeTest : MonoBehaviour
     private Mesh grassBladeData;
     private ComputeBuffer bladeBuffer;
     private ComputeBuffer arcLengthTBuffer;
+    private ComputeBuffer lodTBuffer;
     private RenderParams rp;
     private MaterialPropertyBlock mpb;
     private Matrix4x4[] instanceData;
@@ -48,6 +54,8 @@ public class GrassBladeTest : MonoBehaviour
     private static readonly int BladeBuffer = Shader.PropertyToID("_BladeBuffer");
     private static readonly int Hash = Shader.PropertyToID("hash");
     private static readonly int ArcLengthTBuffer = Shader.PropertyToID("_ArcLengthTBuffer");
+    private static readonly int DValue = Shader.PropertyToID("LoDValue");
+    private static readonly int LodTBuffer = Shader.PropertyToID("_LodTBuffer");
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -63,6 +71,8 @@ public class GrassBladeTest : MonoBehaviour
         bladeBuffer = new ComputeBuffer(1, sizeof(float) * 12);
         arcLengthTBuffer?.Release();
         arcLengthTBuffer = new ComputeBuffer(8, sizeof(float));
+        lodTBuffer?.Release();
+        lodTBuffer = new ComputeBuffer(8, sizeof(float));
         mpb = new MaterialPropertyBlock();
         rp = new RenderParams(bladeMaterial);
         /*{
@@ -108,6 +118,7 @@ public class GrassBladeTest : MonoBehaviour
     {
         bladeBuffer?.Release();
         arcLengthTBuffer?.Release();
+        lodTBuffer?.Release();
     }
 
     // Only needed because ExecuteInEditMode is used, so buffers need to be cleaned while quitting unity and entering playmode
@@ -115,6 +126,7 @@ public class GrassBladeTest : MonoBehaviour
     {
         bladeBuffer?.Release();
         arcLengthTBuffer?.Release();
+        lodTBuffer?.Release();
     }
 
     // Update is called once per frame
@@ -138,9 +150,12 @@ public class GrassBladeTest : MonoBehaviour
         
         bladeBuffer!.SetData(new [] {blade});
         arcLengthTBuffer.SetData(distribution);
+        lodTBuffer.SetData(lodDistribution);
         mpb.SetVector(Hash, hash);
         mpb.SetBuffer(BladeBuffer, bladeBuffer);
         mpb.SetBuffer(ArcLengthTBuffer, arcLengthTBuffer);
+        mpb.SetBuffer(LodTBuffer, lodTBuffer);
+        mpb.SetFloat(DValue, LODValue);
         rp.matProps = mpb;
         
         Graphics.RenderMeshInstanced(rp, grassBladeData, 0, instanceData);

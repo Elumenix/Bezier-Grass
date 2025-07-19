@@ -144,6 +144,13 @@ public class GrassChunkManager : MonoBehaviour
     {
         // ToDo: Bounds for the chunk should be checked to see if it is even visible before running compute shader and instancing
         //if (!IsChunkVisible(chunk)) return;
+        Vector3 cameraPos = mainCamera.transform.position;
+        Vector3 nearestPoint = chunk.chunkBounds.ClosestPoint(cameraPos);
+        float distanceFromChunk = Vector3.Distance(nearestPoint, cameraPos);
+        Debug.Log(distanceFromChunk);
+
+        // This is set up in the GrassMaterial
+        if (distanceFromChunk >= 25.0f) return;
         
         // Reset the buffer. A different amount may be culled this frame
         chunk.grassBuffer.SetCounterValue(0);
