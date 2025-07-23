@@ -338,8 +338,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   terrain: {fileID: 2088398974}
-  chunksPerSide: 1
+  chunksPerSide: 64
   grassMaterial: {fileID: 2100000, guid: 348f0ac48fa547443bc63b5d7550a3cd, type: 2}
+  grassLODMaterial: {fileID: 2100000, guid: b6aebcfb941b0224a99f441c1d91b9a5, type: 2}
   grassMesh: {fileID: -462981019419857548, guid: cd8243b0bcec87e469c0f19dab84e2da, type: 3}
   grassComputeShader: {fileID: 7200000, guid: 41794ce6da9a3544d9b3e27fa2250cd1, type: 3}
   scale: 32

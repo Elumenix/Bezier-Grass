@@ -44,7 +44,6 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     float2 baseCell = floor(uv);
     float minDistToCell = 10.0;
     float2 closestCell;
-
     
     // Voronoi Noise Implementation
     [unroll]

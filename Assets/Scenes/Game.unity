@@ -153,28 +153,32 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   radius: 100000
   LodThresholds:
-  - distance: 100
-    lod: 12
+  - distance: 10
+    lod: 15
+  - distance: 50
+    lod: 14
+  - distance: 150
+    lod: 13
   - distance: 300
-    lod: 11
+    lod: 12
   - distance: 500
+    lod: 11
+  - distance: 800
     lod: 10
-  - distance: 1250
+  - distance: 1350
     lod: 9
-  - distance: 4500
+  - distance: 2000
     lod: 8
-  - distance: 16000
+  - distance: 3500
     lod: 7
-  - distance: 30000
+  - distance: 5000
     lod: 6
-  - distance: 90000
+  - distance: 100000
     lod: 5
-  - distance: 350000
+  - distance: 450000
     lod: 4
-  - distance: 700000
-    lod: 3
   - distance: 1e+32
-    lod: 2
+    lod: 3
 --- !u!23 &73471835
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -301,7 +305,7 @@ MonoBehaviour:
   walkSpeed: 6
   runSpeed: 12
   jumpPower: 7
-  gravity: 30
+  gravity: 100
   lookSpeed: 2
   lookXLimit: 90
   canMove: 1
@@ -415,7 +419,7 @@ Transform:
   m_GameObject: {fileID: 658669000}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 300000, z: 0}
+  m_LocalPosition: {x: 0, y: 500000, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -695,7 +699,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.3
-  far clip plane: 1000000
+  far clip plane: 100000000
   field of view: 60
   orthographic: 0
   orthographic size: 5

@@ -1,4 +1,4 @@
-Shader "Custom/Grass"
+Shader "Custom/GrassLOD"
 {
     Properties
     {
@@ -11,7 +11,6 @@ Shader "Custom/Grass"
         [Header(Blade Behavior)]
         [Toggle] swaying ("Sway Blade", Float) = 0
         windStrength ("Wind Strength", Range(0.0, 5.0)) = 0.5
-        _LodRange ("LOD Range", Vector) = (200, 500, 0, 0)
     }
     SubShader
     {
@@ -27,8 +26,7 @@ Shader "Custom/Grass"
 
         // All data for grass shape is stored on the cpu for efficiency rather than needing to be passed every frame
         // This also means that all instances of this shader share this data rather than every chunk/instance needing it's own version
-        static const float arcTBuffer[8] = { 0.001f, 0.33f, 0.49f, 0.62f, 0.73f, 0.83f, 0.92f, 1.0f };
-        static const float lodTBuffer[8] = { 0.001f, 0.001f, 0.001f, 0.5f, 0.8f, 1.0f, 1.0f, 1.0f };
+        static const float arcTBuffer[4] = { 0.001f, 0.5f, 0.8f, 1.0f };
         StructuredBuffer<GrassBlade> grassBlades; // From the compute shader
         ENDHLSL
         
@@ -54,22 +52,17 @@ Shader "Custom/Grass"
             {
                 GrassBlade blade = grassBlades[instanceID];
 
-                // We want to switch to a low detail grass blade if far away from the mesh. To make this seamless, we're
-                // stretching vertices towards the end of the grass blade so that it fades to a low detail mesh instead of instantly changing
-                float distanceToCamera = distance(blade.position, _WorldSpaceCameraPos);
-                float lodValue = saturate((distanceToCamera - _LodRange.x) / (_LodRange.y - _LodRange.x));
-
                 // We're precomputing ArcT instead of doing an expensive arc length parameterization calculation in the vertex shader
                 // There's no closed form solution for arc length parameterization for cubic bezier curves, so this is much easier
                 uint vertex = input.vertexID;
                 uint pair = vertex / 2;
-                float t = lerp(arcTBuffer[pair], lodTBuffer[pair], lodValue);
+                float t = arcTBuffer[pair];
 
                 float3 pos;
                 float3 normalOS;
                 float3 widthDir;
                 CalculateBezierCurve(blade, t, pos, normalOS, widthDir);
-                
+            
                 // Blade will get skinnier the further up it goes, with point 14 (the last one) being along the center
                 float sideOffset = blade.width - (blade.width * t * t);
                 int odd = (vertex % 2) * 2 - 1; // -1 or 1
@@ -81,7 +74,7 @@ Shader "Custom/Grass"
                 o.positionWS = positionWS;
                 o.normalWS = TransformObjectToWorld(normalOS);
                 o.vertexID = vertex;
-                o.uv = float2(vertex == 14 ? .5 : vertex % 2, t);
+                o.uv = float2(vertex == 6 ? .5 : vertex % 2, t);
             }
 
             float4 Fragment(Varyings input) : SV_Target 

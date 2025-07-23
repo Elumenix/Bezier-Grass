@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Unity.VisualScripting;
+using UnityEditor;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 using Matrix4x4 = UnityEngine.Matrix4x4;
@@ -18,10 +19,12 @@ public class GrassChunkManager : MonoBehaviour
     
     [Header("Grass Settings")]
     [SerializeField] private Material grassMaterial;
+    [SerializeField] private Material grassLODMaterial;
     [SerializeField] private Mesh grassMesh;
     //[SerializeField] private float grassDensity = 10f; // grass per square meter
     public ComputeShader grassComputeShader;
     private GraphicsBuffer highResIndexBuffer;
+    private GraphicsBuffer lowResIndexBuffer;
     private GraphicsBuffer grassDesc;
     
     public float scale = 32;
@@ -68,6 +71,17 @@ public class GrassChunkManager : MonoBehaviour
         highResIndexBuffer = new GraphicsBuffer(Target.Index, 39, sizeof(uint));
         highResIndexBuffer.SetData(indices);
         
+        uint[] indicesLOD = new uint[]
+        {
+            0, 1, 3,
+            3, 2, 0,
+            2, 3, 5,
+            5, 4, 2,
+            4, 5, 6,
+        };
+        lowResIndexBuffer = new GraphicsBuffer(Target.Index, 15, sizeof(uint));
+        lowResIndexBuffer.SetData(indicesLOD);
+        
         grassDesc = new GraphicsBuffer(Target.Constant, 1, sizeof(float) * 6);
         grassDesc.SetData(new [] { grassShape });
         
@@ -82,6 +96,7 @@ public class GrassChunkManager : MonoBehaviour
     {
         // Prevent memory problems
         highResIndexBuffer?.Release();
+        lowResIndexBuffer?.Release();
         grassDesc?.Release();
     }
 
@@ -144,13 +159,8 @@ public class GrassChunkManager : MonoBehaviour
     {
         // ToDo: Bounds for the chunk should be checked to see if it is even visible before running compute shader and instancing
         //if (!IsChunkVisible(chunk)) return;
-        Vector3 cameraPos = mainCamera.transform.position;
-        Vector3 nearestPoint = chunk.chunkBounds.ClosestPoint(cameraPos);
-        float distanceFromChunk = Vector3.Distance(nearestPoint, cameraPos);
-        Debug.Log(distanceFromChunk);
-
-        // This is set up in the GrassMaterial
-        if (distanceFromChunk >= 25.0f) return;
+        
+        
         
         // Reset the buffer. A different amount may be culled this frame
         chunk.grassBuffer.SetCounterValue(0);
@@ -160,23 +170,41 @@ public class GrassChunkManager : MonoBehaviour
         grassComputeShader.SetFloat("scale", scale);
         grassComputeShader.SetVector("startPosition", chunk.chunkBounds.min);
         grassComputeShader.SetFloat("grassDist", grassDist);
-        
         grassComputeShader.Dispatch(0, 1, 1, 1);
-
-        
-        // TODO: uncomment this after compute shader is set up properly
-        int instanceCountOffset = sizeof(uint); // byte offset of the second uint
-        GraphicsBuffer.CopyCount(
-            chunk.grassBuffer,
-            chunk.commandBuffer,
-            instanceCountOffset
-        );
         
         
-        // TODO: LOD changes will need to happen somewhere around here
+        //Vector3 cameraPos = mainCamera.transform.position;
         chunk.rp.matProps.SetBuffer(GrassBlades, chunk.grassBuffer);
         chunk.rp.worldBounds = chunk.chunkBounds;
-        Graphics.RenderPrimitivesIndexedIndirect(chunk.rp, MeshTopology.Triangles, highResIndexBuffer, chunk.commandBuffer);
+        Vector3 cameraPos = SceneView.lastActiveSceneView.camera.transform.position;
+        Vector3 nearestPoint = chunk.chunkBounds.ClosestPoint(cameraPos);
+        float distanceFromChunk = Vector3.Distance(nearestPoint, cameraPos);
+
+        // This is set up in the GrassMaterial
+        if (distanceFromChunk >= 25.0f) // low LOD
+        {
+            GraphicsBuffer.CopyCount(
+                chunk.grassBuffer,
+                chunk.lowLodCommandBuffer,
+                4
+            );
+
+            chunk.rp.material = grassLODMaterial;
+            Graphics.RenderPrimitivesIndexedIndirect(chunk.rp, MeshTopology.Triangles, lowResIndexBuffer, chunk.lowLodCommandBuffer);
+        }
+        else // high LOD
+        {
+            GraphicsBuffer.CopyCount(
+                chunk.grassBuffer,
+                chunk.commandBuffer,
+                4
+            );
+
+            chunk.rp.material = grassMaterial;
+            chunk.rp.matProps.SetBuffer(GrassBlades, chunk.grassBuffer);
+            chunk.rp.worldBounds = chunk.chunkBounds;
+            Graphics.RenderPrimitivesIndexedIndirect(chunk.rp, MeshTopology.Triangles, highResIndexBuffer, chunk.commandBuffer);
+        }
     }
     
     /*int GetChunkSeed(Vector2Int coord)
@@ -260,13 +288,14 @@ public class GrassChunkManager : MonoBehaviour
     }
 }
 
-[System.Serializable]
+[Serializable]
 public class GrassChunk
 {
     public Vector2Int coordinate;
     public Bounds chunkBounds;
     public GraphicsBuffer grassBuffer;
     public GraphicsBuffer commandBuffer;
+    public GraphicsBuffer lowLodCommandBuffer;
     public RenderParams rp;
 
     
@@ -282,6 +311,7 @@ public class GrassChunk
         // This should never be resized, so setting it here is fine
         commandBuffer = new GraphicsBuffer(Target.IndirectArguments, 1, sizeof(uint) * 5);
         
+        // TODO: Creating a new one for every chunk. Might be able to copy instead as an optimization
         IndirectDrawIndexedArgs[] args = new IndirectDrawIndexedArgs[1];
         args[0] = new IndirectDrawIndexedArgs
         {
@@ -292,12 +322,19 @@ public class GrassChunk
             startInstanceLocation = 0
         };
         commandBuffer.SetData(args);
+        
+        
+        // This should never be resized, so setting it here is fine
+        lowLodCommandBuffer = new GraphicsBuffer(Target.IndirectArguments, 1, sizeof(uint) * 5);
+        args[0].indexCountPerInstance = 15;
+        lowLodCommandBuffer.SetData(args);
     }
     
     public void Dispose()
     {
         grassBuffer.Release();
         commandBuffer.Release();
+        lowLodCommandBuffer.Release();
     }
 }
 
