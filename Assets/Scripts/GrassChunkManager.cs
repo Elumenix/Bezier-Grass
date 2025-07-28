@@ -1,13 +1,8 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
 using System.Runtime.InteropServices;
-using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
-using Matrix4x4 = UnityEngine.Matrix4x4;
 using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
 
@@ -15,42 +10,52 @@ public class GrassChunkManager : MonoBehaviour
 {
     [Header("Terrain Setup")]
     [SerializeField] private Terrain terrain;
-    [SerializeField] private int chunksPerSide = 8;
+    [Range(1, 128)] public int chunksPerSide;
     
     [Header("Grass Settings")]
-    [SerializeField] private Material grassMaterial;
-    [SerializeField] private Material grassLODMaterial;
+    public static Material grassMaterial;
+    public static Material grassLODMaterial;
     [SerializeField] private Mesh grassMesh;
     //[SerializeField] private float grassDensity = 10f; // grass per square meter
     public ComputeShader grassComputeShader;
-    private GraphicsBuffer highResIndexBuffer;
-    private GraphicsBuffer lowResIndexBuffer;
+    public static GraphicsBuffer highResIndexBuffer;
+    public static GraphicsBuffer lowResIndexBuffer;
     private GraphicsBuffer grassDesc;
     
     public float scale = 32;
     private float grassDist;
+    public static float chunkSize;
     
     // Chunk management
     //private Dictionary<Vector2Int, GrassChunk> activeChunks = new Dictionary<Vector2Int, GrassChunk>();
     private GrassChunk[] activeChunks;
     
     // Terrain properties
-    private float chunkSizeX;
-    private float chunkSizeZ;
     private Vector2Int totalChunkCount;
-    private Vector3 terrainPosition;
+    public static Vector3 terrainPosition;
     private Vector3 terrainSize;
-
-    public GrassShape grassShape;
+    [SerializeField] private GrassShape grassShapeRange; 
+    private static GrassShape grassShape;
     
     // Camera reference
     private Camera mainCamera;
-    private static readonly int GrassBlades = Shader.PropertyToID("grassBlades");
     private static readonly int Shape = Shader.PropertyToID("GrassShape");
+    private static readonly int Scale = Shader.PropertyToID("scale");
+    private static readonly int GrassDist = Shader.PropertyToID("grassDist");
+
+    private void Awake()
+    {
+        grassMaterial = Resources.Load<Material>("Materials/GrassMaterial");
+        grassLODMaterial = Resources.Load<Material>("Materials/GrassLODMaterial");
+        
+        // Temp, updated during start
+        grassShape = new GrassShape();
+    }
 
     void Start()
     {
         mainCamera = Camera.main;
+        grassShape = grassShapeRange;
 
         uint[] indices = new uint[]
         {
@@ -113,9 +118,8 @@ public class GrassChunkManager : MonoBehaviour
         terrainSize = terrain.terrainData.size;
         
         // Terrain may not be perfectly square. The chunks should be though
-        chunkSizeX = terrainSize.x / chunksPerSide;
-        chunkSizeZ = terrainSize.z / chunksPerSide;
-        grassDist = chunkSizeX / 32;
+        chunkSize = terrainSize.x / chunksPerSide;
+        grassDist = chunkSize / 32;
         totalChunkCount = new Vector2Int(chunksPerSide, chunksPerSide);
         activeChunks = new GrassChunk[totalChunkCount.x * totalChunkCount.y];
 
@@ -125,21 +129,16 @@ public class GrassChunkManager : MonoBehaviour
             for (int z = 0; z < chunksPerSide; z++)
             {
                 Vector2Int coord = new Vector2Int(x, z);
-                
-                GrassChunk chunk = new GrassChunk(grassMaterial)
-                {
-                    coordinate = coord,
-                    chunkBounds = GetChunkBounds(coord)
-                };
+                GrassChunk chunk = new GrassChunk(coord);
     
-                //GenerateGrassForChunk(chunk);
                 activeChunks[i] = chunk;
                 i++;
             }
         }  
         
-        Debug.Log($"Initialized grass chunks: {totalChunkCount.x}x{totalChunkCount.y}, " +
-                  $"chunk size: {chunkSizeX:F1}x{chunkSizeZ:F1}");
+        // At this point, some information based on chunk positioning for the compute shader will be set and stay unchanged
+        grassComputeShader.SetFloat(Scale, scale);
+        grassComputeShader.SetFloat(GrassDist, grassDist);
     }
     
     void Update()
@@ -157,54 +156,7 @@ public class GrassChunkManager : MonoBehaviour
     
     void GenerateGrassForChunk(GrassChunk chunk)
     {
-        // ToDo: Bounds for the chunk should be checked to see if it is even visible before running compute shader and instancing
-        //if (!IsChunkVisible(chunk)) return;
-        
-        
-        
-        // Reset the buffer. A different amount may be culled this frame
-        chunk.grassBuffer.SetCounterValue(0);
-        
-        // TODO: These might not even need to be in the manager class, I might expand the chunk class instead
-        grassComputeShader.SetBuffer(0, GrassBlades, chunk.grassBuffer);
-        grassComputeShader.SetFloat("scale", scale);
-        grassComputeShader.SetVector("startPosition", chunk.chunkBounds.min);
-        grassComputeShader.SetFloat("grassDist", grassDist);
-        grassComputeShader.Dispatch(0, 1, 1, 1);
-        
-        
-        //Vector3 cameraPos = mainCamera.transform.position;
-        chunk.rp.matProps.SetBuffer(GrassBlades, chunk.grassBuffer);
-        chunk.rp.worldBounds = chunk.chunkBounds;
-        Vector3 cameraPos = SceneView.lastActiveSceneView.camera.transform.position;
-        Vector3 nearestPoint = chunk.chunkBounds.ClosestPoint(cameraPos);
-        float distanceFromChunk = Vector3.Distance(nearestPoint, cameraPos);
-
-        // This is set up in the GrassMaterial
-        if (distanceFromChunk >= 25.0f) // low LOD
-        {
-            GraphicsBuffer.CopyCount(
-                chunk.grassBuffer,
-                chunk.lowLodCommandBuffer,
-                4
-            );
-
-            chunk.rp.material = grassLODMaterial;
-            Graphics.RenderPrimitivesIndexedIndirect(chunk.rp, MeshTopology.Triangles, lowResIndexBuffer, chunk.lowLodCommandBuffer);
-        }
-        else // high LOD
-        {
-            GraphicsBuffer.CopyCount(
-                chunk.grassBuffer,
-                chunk.commandBuffer,
-                4
-            );
-
-            chunk.rp.material = grassMaterial;
-            chunk.rp.matProps.SetBuffer(GrassBlades, chunk.grassBuffer);
-            chunk.rp.worldBounds = chunk.chunkBounds;
-            Graphics.RenderPrimitivesIndexedIndirect(chunk.rp, MeshTopology.Triangles, highResIndexBuffer, chunk.commandBuffer);
-        }
+        chunk.DrawChunk(ref grassComputeShader);
     }
     
     /*int GetChunkSeed(Vector2Int coord)
@@ -220,32 +172,13 @@ public class GrassChunkManager : MonoBehaviour
             chunk.Dispose();
             activeChunks.Remove(coord);
         }
-    }
+    }*/
     
     bool IsChunkVisible(GrassChunk chunk)
     {
         // Simple frustum culling
         Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(mainCamera);
         return GeometryUtility.TestPlanesAABB(frustumPlanes, chunk.bounds);
-    }*/
-    
-    
-    public Bounds GetChunkBounds(Vector2Int chunkCoord)
-    {
-        // TODO: When getting to culling, we'll probably have offsets so we need to make sure the chunk is expanded a little to prevent premature culling
-        // TODO: This works for flat terrain currently, vertical bounds may need to change when adding hills
-        
-        // Because unity's procedural instancing function still requires a bounds, we set it to the bounds for the chunk
-        // The function treats rendering as all grass blades or no grass blades, so we make sure the bounds covers the whole chunk
-        Vector3 chunkMin = terrainPosition + new Vector3(
-            chunkCoord.x * chunkSizeX,
-            0,
-            chunkCoord.y * chunkSizeZ
-        );
-        
-        // Grass blades vertical height also needs to fit the chunk to prevent culling (20 is a pretty safe number)
-        Vector3 chunkSize = new Vector3(chunkSizeX, 20, chunkSizeZ);
-        return new Bounds(chunkMin + chunkSize * 0.5f, chunkSize);
     }
     
     void OnDestroy()
@@ -267,14 +200,14 @@ public class GrassChunkManager : MonoBehaviour
         Gizmos.color = Color.yellow;
         for (int x = 0; x <= chunksPerSide; x++)
         {
-            Vector3 start = terrainPosition + new Vector3(x * chunkSizeX, 0, 0);
+            Vector3 start = terrainPosition + new Vector3(x * chunksPerSide, 0, 0);
             Vector3 end = start + new Vector3(0, 0, terrainSize.z);
             Gizmos.DrawLine(start, end);
         }
         
         for (int z = 0; z <= chunksPerSide; z++)
         {
-            Vector3 start = terrainPosition + new Vector3(0, 0, z * chunkSizeZ);
+            Vector3 start = terrainPosition + new Vector3(0, 0, z * chunksPerSide);
             Vector3 end = start + new Vector3(terrainSize.x, 0, 0);
             Gizmos.DrawLine(start, end);
         }
@@ -283,69 +216,9 @@ public class GrassChunkManager : MonoBehaviour
         Gizmos.color = Color.green;
         foreach (GrassChunk chunk in activeChunks)
         {
-            Gizmos.DrawWireCube(chunk.chunkBounds.center, chunk.chunkBounds.size);
+            Gizmos.DrawWireCube(chunk.bounds.center, chunk.bounds.size);
         }
     }
-}
-
-[Serializable]
-public class GrassChunk
-{
-    public Vector2Int coordinate;
-    public Bounds chunkBounds;
-    public GraphicsBuffer grassBuffer;
-    public GraphicsBuffer commandBuffer;
-    public GraphicsBuffer lowLodCommandBuffer;
-    public RenderParams rp;
-
-    
-
-    public GrassChunk(Material grassMaterial)
-    {
-        grassBuffer = new GraphicsBuffer(Target.Structured | Target.Append, 1024, sizeof(float) * 12);
-        rp = new RenderParams(grassMaterial)
-        {
-            matProps = new MaterialPropertyBlock()
-        };
-        
-        // This should never be resized, so setting it here is fine
-        commandBuffer = new GraphicsBuffer(Target.IndirectArguments, 1, sizeof(uint) * 5);
-        
-        // TODO: Creating a new one for every chunk. Might be able to copy instead as an optimization
-        IndirectDrawIndexedArgs[] args = new IndirectDrawIndexedArgs[1];
-        args[0] = new IndirectDrawIndexedArgs
-        {
-            indexCountPerInstance = 39,
-            instanceCount         = 0, // Resized in draw call
-            startIndexLocation    = 0,
-            baseVertexLocation    = 0,
-            startInstanceLocation = 0
-        };
-        commandBuffer.SetData(args);
-        
-        
-        // This should never be resized, so setting it here is fine
-        lowLodCommandBuffer = new GraphicsBuffer(Target.IndirectArguments, 1, sizeof(uint) * 5);
-        args[0].indexCountPerInstance = 15;
-        lowLodCommandBuffer.SetData(args);
-    }
-    
-    public void Dispose()
-    {
-        grassBuffer.Release();
-        commandBuffer.Release();
-        lowLodCommandBuffer.Release();
-    }
-}
-
-[StructLayout(LayoutKind.Sequential)]
-struct IndirectDrawIndexedArgs
-{
-    public uint indexCountPerInstance;   // number of indices in one mesh/instance
-    public uint instanceCount;           // how many instances to draw
-    public uint startIndexLocation;      // offset into the index buffer (in indices)
-    public uint baseVertexLocation;      // add to each index from index buffer
-    public uint startInstanceLocation;   // add to SV_InstanceID
 }
 
 [Serializable]
