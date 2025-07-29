@@ -1,6 +1,5 @@
 using System;
 using System.Runtime.InteropServices;
-using UnityEditor;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 using Vector2 = UnityEngine.Vector2;
@@ -42,6 +41,7 @@ public class GrassChunkManager : MonoBehaviour
     private static readonly int Shape = Shader.PropertyToID("GrassShape");
     private static readonly int Scale = Shader.PropertyToID("scale");
     private static readonly int GrassDist = Shader.PropertyToID("grassDist");
+    private static readonly int FrustumData = Shader.PropertyToID("frustumData");
 
     private void Awake()
     {
@@ -148,15 +148,33 @@ public class GrassChunkManager : MonoBehaviour
     
     void UpdateActiveChunks()
     {
+        Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(mainCamera);
+        float[] frustumData = new float[24];
+
+        // If the chunk is in bounds, we further cull in the compute shader to only blades visible on screen
+        // This results in less contention to the append buffer and prevents rendering redundant blades
+        // We need to collect the camera data needed to do frustum culling in the compute shader here 
+        for (int i = 0; i < 6; i++)
+        {
+            frustumData[i * 4 + 0] = frustumPlanes[i].normal.x;
+            frustumData[i * 4 + 1] = frustumPlanes[i].normal.y;
+            frustumData[i * 4 + 2] = frustumPlanes[i].normal.z;
+            frustumData[i * 4 + 3] = frustumPlanes[i].distance;
+        }
+        grassComputeShader.SetFloats(FrustumData, frustumData);
+        
+        
+        // See if we should render each active chunk
         foreach (GrassChunk chunk in activeChunks)
         {
-            GenerateGrassForChunk(chunk);
+            // Simple frustum culling
+            // While this is already done automatically by the draw calls, doing this early
+            // lets us skip the compute shader call, which should speed up the program
+            if (GeometryUtility.TestPlanesAABB(frustumPlanes, chunk.bounds))
+            {
+                chunk.DrawChunk(ref grassComputeShader);
+            }
         }
-    }
-    
-    void GenerateGrassForChunk(GrassChunk chunk)
-    {
-        chunk.DrawChunk(ref grassComputeShader);
     }
     
     /*int GetChunkSeed(Vector2Int coord)
@@ -173,13 +191,6 @@ public class GrassChunkManager : MonoBehaviour
             activeChunks.Remove(coord);
         }
     }*/
-    
-    bool IsChunkVisible(GrassChunk chunk)
-    {
-        // Simple frustum culling
-        Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(mainCamera);
-        return GeometryUtility.TestPlanesAABB(frustumPlanes, chunk.bounds);
-    }
     
     void OnDestroy()
     {

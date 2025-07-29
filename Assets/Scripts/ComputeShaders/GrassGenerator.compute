@@ -2,9 +2,10 @@
 #pragma kernel CSMain
 #include "./Assets/Shaders/Includes/GrassBlade.cginc"
 
-
-// Our main goal here is to instantiate information 
+// Our main goal here is to get instance information for each grass blade we will render
 AppendStructuredBuffer<GrassBlade> grassBlades;
+
+float4 frustumData[6];
 float scale;
 float grassDist;
 float3 startPosition;
@@ -28,6 +29,19 @@ float pcg_float(uint input) {
     return float((word >> 22u) ^ word) * (1.0f / 4294967295.0f);
 }
 
+bool isVisible(float3 bladePos)
+{
+    // The way that frustum culling works is if the sphere is outside any plane, then it is not visible
+    for (int i = 0; i < 6; i++)
+    {
+        // We assume the blade has a radius of 3. This helps get the tip of the blade in since it's randomly
+        // directed away from the base (which is bladePos). Spherical bounds tests are also more efficient than AABB
+        if (dot(frustumData[i].xyz, bladePos) + frustumData[i].w < -3) return false;
+    }
+
+    return true;
+}
+
 [numthreads(32,1,32)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
@@ -37,6 +51,10 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     float2 gridPos = startPosition.xz + float2(id.xz) * grassDist; 
     float2 offsetPos = gridPos + rand2(gridPos) * grassDist; // Jitter point to prevent visible grid
     float3 worldPos = float3(offsetPos.x, startPosition.y, offsetPos.y);
+
+    // Early out if the blade wouldn't be visible. Don't add it to the appendBuffer because it shouldn't be rendered
+    // This also takes some of the write contention away from the buffer for this chunks shader call
+    if (!isVisible(worldPos)) return;
 
     // Variables to set up the Voronoi Noise
     int _NumPoints = 10;

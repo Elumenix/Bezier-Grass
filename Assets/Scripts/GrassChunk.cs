@@ -90,11 +90,6 @@ public class GrassChunk
     
     public void DrawChunk(ref ComputeShader grassComputeShader)
     {
-        // ToDo: Bounds for the chunk should be checked to see if it is even visible before running compute shader and instancing
-        //if (!IsChunkVisible(chunk)) return;
-        
-        
-        
         // Reset the buffer. A different amount may be culled this frame
         grassBuffer.SetCounterValue(0);
         
