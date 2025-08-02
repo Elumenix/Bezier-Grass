@@ -42,80 +42,84 @@ bool isVisible(float3 bladePos)
     return true;
 }
 
-[numthreads(32,1,32)]
+[numthreads(8,1,8)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    // This doesn't quite line up, If I move to the middle, there's no guarantee of the same starting height
-    // I'll need to find a solution to this later on so that it lines up with the terrain
-    
-    float2 gridPos = startPosition.xz + float2(id.xz) * grassDist; 
-    float2 offsetPos = gridPos + rand2(gridPos) * grassDist; // Jitter point to prevent visible grid
-    float3 worldPos = float3(offsetPos.x, startPosition.y, offsetPos.y);
-
-    // Early out if the blade wouldn't be visible. Don't add it to the appendBuffer because it shouldn't be rendered
-    // This also takes some of the write contention away from the buffer for this chunks shader call
-    if (!isVisible(worldPos)) return;
-
-    // Variables to set up the Voronoi Noise
-    int _NumPoints = 10;
-    float2 uv = (offsetPos  * _NumPoints) / scale;
-    float2 baseCell = floor(uv);
-    float minDistToCell = 10.0;
-    float2 closestCell;
-    
-    // Voronoi Noise Implementation
-    [unroll]
-    for (int x = -1; x <= 1; x++)
+    // Each thread handles 4 grass blades
+    for (int i = 0; i < 4; i++)
     {
+        // This doesn't quite line up, If I move to the middle, there's no guarantee of the same starting height
+        // I'll need to find a solution to this later on so that it lines up with the terrain
+    
+        float2 gridPos = startPosition.xz + float2(id.x * 4 + i, id.z * 4 + i) * grassDist; 
+        float2 offsetPos = gridPos + rand2(gridPos) * grassDist; // Jitter point to prevent visible grid
+        float3 worldPos = float3(offsetPos.x, startPosition.y, offsetPos.y);
+
+        // Early out if the blade wouldn't be visible. Don't add it to the appendBuffer because it shouldn't be rendered
+        // This also takes some of the write contention away from the buffer for this chunks shader call
+        if (!isVisible(worldPos)) continue;
+
+        // Variables to set up the Voronoi Noise
+        int _NumPoints = 10;
+        float2 uv = (offsetPos  * _NumPoints) / scale;
+        float2 baseCell = floor(uv);
+        float minDistToCell = 10.0;
+        float2 closestCell;
+    
+        // Voronoi Noise Implementation
         [unroll]
-        for (int y = -1; y <= 1; y++)
+        for (int x = -1; x <= 1; x++)
         {
-            float2 cell = baseCell + float2(x,y);
-            float2 wrappedCell = fmod(cell + _NumPoints, _NumPoints);
+            [unroll]
+            for (int y = -1; y <= 1; y++)
+            {
+                float2 cell = baseCell + float2(x,y);
+                float2 wrappedCell = fmod(cell + _NumPoints, _NumPoints);
                         
-            float2 cellPosition = wrappedCell + rand2(wrappedCell);
-            float2 diff = cellPosition - uv;
+                float2 cellPosition = wrappedCell + rand2(wrappedCell);
+                float2 diff = cellPosition - uv;
 
 
-            float2 wrappedDiff = diff;
-            if (abs(diff.x) > _NumPoints * 0.5) {
-                wrappedDiff.x = diff.x - sign(diff.x) * _NumPoints;
-            }
-            if (abs(diff.y) > _NumPoints * 0.5) {
-                wrappedDiff.y = diff.y - sign(diff.y) * _NumPoints;
-            }
+                float2 wrappedDiff = diff;
+                if (abs(diff.x) > _NumPoints * 0.5) {
+                    wrappedDiff.x = diff.x - sign(diff.x) * _NumPoints;
+                }
+                if (abs(diff.y) > _NumPoints * 0.5) {
+                    wrappedDiff.y = diff.y - sign(diff.y) * _NumPoints;
+                }
 
             
-            float distToCell = length(wrappedDiff);
-            if (distToCell < minDistToCell)
-            {
-                minDistToCell = distToCell;
-                closestCell = wrappedCell;
+                float distToCell = length(wrappedDiff);
+                if (distToCell < minDistToCell)
+                {
+                    minDistToCell = distToCell;
+                    closestCell = wrappedCell;
+                }
             }
         }
+
+
+        // Use pcg hashes (based on this grass blades position) to get multiple random numbers quickly
+        uint seed = worldPos.x + worldPos.z * 1000u;
+        float random1 = pcg_float(seed + 0u);
+        float random2 = pcg_float(seed + 1u);
+        float random3 = pcg_float(seed + 2u);
+        float random4 = pcg_float(seed + 3u);
+        float random5 = pcg_float(seed + 4u);
+        //float random6 = pcg_float(seed + 5u);
+
+    
+        GrassBlade blade;
+        blade.position = worldPos;
+        blade.height = random1 * (height.y - height.x) + height.x;
+        blade.nearestClumpPosition = float3(closestCell.x, 0, closestCell.y);
+        blade.facing = normalize(float2(random2, random3) * 2.0f - 1); // Between -1 and 1
+        blade.width = -.2f;
+        blade.tilt = random4 * (tilt.y - tilt.x) + tilt.x;
+        blade.bend = random5 * (bend.y - bend.x) + bend.x;
+
+    
+        // Add this to the blades that will be rendered next frame
+        grassBlades.Append(blade);
     }
-
-
-    // Use pcg hashes (based on this grass blades position) to get multiple random numbers quickly
-    uint seed = worldPos.x + worldPos.z * 1000u;
-    float random1 = pcg_float(seed + 0u);
-    float random2 = pcg_float(seed + 1u);
-    float random3 = pcg_float(seed + 2u);
-    float random4 = pcg_float(seed + 3u);
-    float random5 = pcg_float(seed + 4u);
-    //float random6 = pcg_float(seed + 5u);
-
-    
-    GrassBlade blade;
-    blade.position = worldPos;
-    blade.height = random1 * (height.y - height.x) + height.x;
-    blade.nearestClumpPosition = float3(closestCell.x, 0, closestCell.y);
-    blade.facing = normalize(float2(random2, random3) * 2.0f - 1); // Between -1 and 1
-    blade.width = -.2f;
-    blade.tilt = random4 * (tilt.y - tilt.x) + tilt.x;
-    blade.bend = random5 * (bend.y - bend.x) + bend.x;
-
-    
-    // Add this to the blades that will be rendered next frame
-    grassBlades.Append(blade);
 }

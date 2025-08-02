@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Default Local Group
+  m_EditorClassIdentifier: 
+  m_GroupName: Default Local Group
+  m_GUID: cc566f814c4e1834995dc170ffa47444
+  m_SerializeEntries:
+  - m_GUID: 348f0ac48fa547443bc63b5d7550a3cd
+    m_Address: Assets/Materials/GrassMaterial.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Grass
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b6aebcfb941b0224a99f441c1d91b9a5
+    m_Address: Assets/Materials/GrassLODMaterial.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - GrassLOD
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: bc0774f0c5d7d5743a7d1340fb46c063, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: dc207dd7aa139fd4d99e2f768d2c4e87, type: 2}
+    - {fileID: 11400000, guid: e942a2eec9cce7d48973893f80795355, type: 2}

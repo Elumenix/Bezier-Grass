@@ -1,6 +1,12 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+using UnityEditor;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 using static UnityEngine.GraphicsBuffer;
 using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
@@ -15,7 +21,6 @@ public class GrassChunkManager : MonoBehaviour
     public static Material grassMaterial;
     public static Material grassLODMaterial;
     [SerializeField] private Mesh grassMesh;
-    //[SerializeField] private float grassDensity = 10f; // grass per square meter
     public ComputeShader grassComputeShader;
     public static GraphicsBuffer highResIndexBuffer;
     public static GraphicsBuffer lowResIndexBuffer;
@@ -35,6 +40,8 @@ public class GrassChunkManager : MonoBehaviour
     private Vector3 terrainSize;
     [SerializeField] private GrassShape grassShapeRange; 
     private static GrassShape grassShape;
+    private static bool materialsLoaded;
+
     
     // Camera reference
     private Camera mainCamera;
@@ -45,14 +52,29 @@ public class GrassChunkManager : MonoBehaviour
 
     private void Awake()
     {
-        grassMaterial = Resources.Load<Material>("Materials/GrassMaterial");
-        grassLODMaterial = Resources.Load<Material>("Materials/GrassLODMaterial");
+
+        LoadMaterials();
+    }
+    private async void LoadMaterials()
+    {
+        try
+        {
+            AsyncOperationHandle<Material> grassHandle = Addressables.LoadAssetAsync<Material>("Grass");
+            AsyncOperationHandle<Material> grassLODHandle = Addressables.LoadAssetAsync<Material>("GrassLOD");
         
-        // Temp, updated during start
-        grassShape = new GrassShape();
+            await Task.WhenAll(grassHandle.Task, grassLODHandle.Task);
+        
+            grassMaterial = grassHandle.Result;
+            grassLODMaterial = grassLODHandle.Result;
+            materialsLoaded = true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Failed to load materials: {e.Message}");
+        }
     }
 
-    void Start()
+    private void Start()
     {
         mainCamera = Camera.main;
         grassShape = grassShapeRange;
@@ -92,7 +114,6 @@ public class GrassChunkManager : MonoBehaviour
         
         // This lasts for the life of the program, so it can be set now
         grassComputeShader.SetConstantBuffer(Shape, grassDesc, 0, 32);
-
         
         InitializeChunks();
     }
@@ -112,16 +133,29 @@ public class GrassChunkManager : MonoBehaviour
         grassComputeShader.SetConstantBuffer(Shape, grassDesc, 0, 32);
     }
 
-    void InitializeChunks()
+    private async void InitializeChunks()
     {
+        // We'll be pausing execution here until all the materials in the start method are loaded
+        while (!materialsLoaded)
+        {
+            await Task.Yield();
+        }
+        
         terrainPosition = terrain.transform.position;
         terrainSize = terrain.terrainData.size;
         
         // Terrain may not be perfectly square. The chunks should be though
         chunkSize = terrainSize.x / chunksPerSide;
-        grassDist = chunkSize / 32;
+        grassDist = chunkSize / 128.0f;
+        
+        // At this point, some information based on chunk positioning for the compute shader will be set and stay unchanged
+        grassComputeShader.SetFloat(Scale, scale);
+        grassComputeShader.SetFloat(GrassDist, grassDist);
+        
+        // Set up chunk tracking 
         totalChunkCount = new Vector2Int(chunksPerSide, chunksPerSide);
         activeChunks = new GrassChunk[totalChunkCount.x * totalChunkCount.y];
+        Vector3 cameraPos = mainCamera.transform.position;//SceneView.lastActiveSceneView.camera.transform.position;
 
         int i = 0;
         for (int x = 0; x < chunksPerSide; x++)
@@ -130,15 +164,14 @@ public class GrassChunkManager : MonoBehaviour
             {
                 Vector2Int coord = new Vector2Int(x, z);
                 GrassChunk chunk = new GrassChunk(coord);
+                
+                // Immediately Call to fill the graphics buffers
+                chunk.CalculateAndDrawChunk(ref grassComputeShader, ref cameraPos);
     
                 activeChunks[i] = chunk;
                 i++;
             }
         }  
-        
-        // At this point, some information based on chunk positioning for the compute shader will be set and stay unchanged
-        grassComputeShader.SetFloat(Scale, scale);
-        grassComputeShader.SetFloat(GrassDist, grassDist);
     }
     
     void Update()
@@ -148,6 +181,10 @@ public class GrassChunkManager : MonoBehaviour
     
     void UpdateActiveChunks()
     {
+        // If we're still loading the data, don't try reading from the list
+        if (activeChunks == null) return;
+        
+        
         Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(mainCamera);
         float[] frustumData = new float[24];
 
@@ -172,7 +209,7 @@ public class GrassChunkManager : MonoBehaviour
             // lets us skip the compute shader call, which should speed up the program
             if (GeometryUtility.TestPlanesAABB(frustumPlanes, chunk.bounds))
             {
-                chunk.DrawChunk(ref grassComputeShader);
+                chunk.DrawChunk();
             }
         }
     }
@@ -207,21 +244,6 @@ public class GrassChunkManager : MonoBehaviour
         if (!Application.isPlaying) return;
         if (terrain == null) return;
         
-        // Draw chunk grid
-        Gizmos.color = Color.yellow;
-        for (int x = 0; x <= chunksPerSide; x++)
-        {
-            Vector3 start = terrainPosition + new Vector3(x * chunksPerSide, 0, 0);
-            Vector3 end = start + new Vector3(0, 0, terrainSize.z);
-            Gizmos.DrawLine(start, end);
-        }
-        
-        for (int z = 0; z <= chunksPerSide; z++)
-        {
-            Vector3 start = terrainPosition + new Vector3(0, 0, z * chunksPerSide);
-            Vector3 end = start + new Vector3(terrainSize.x, 0, 0);
-            Gizmos.DrawLine(start, end);
-        }
         
         // Draw active chunks
         Gizmos.color = Color.green;

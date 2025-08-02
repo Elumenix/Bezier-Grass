@@ -20,6 +20,7 @@ public class GrassChunk
     private readonly GraphicsBuffer commandBuffer;
     private readonly GraphicsBuffer lowLodCommandBuffer;
     private RenderParams rp;
+    private bool isHighLOD;
     
     // Saved shader property to prevent string lookup
     private static readonly int StartPosition = Shader.PropertyToID("startPosition");
@@ -30,7 +31,7 @@ public class GrassChunk
     {
         coordinate = chunkCoord;
         bounds = GetChunkBounds();
-        grassBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Append, 1024, sizeof(float) * 12);
+        grassBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Append, 4096, sizeof(float) * 12);
         rp = new RenderParams(GrassChunkManager.grassMaterial)
         {
             matProps = new MaterialPropertyBlock()
@@ -39,7 +40,6 @@ public class GrassChunk
         // This should never be resized, so setting it here is fine
         commandBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, sizeof(uint) * 5);
         
-        // TODO: Creating a new one for every chunk. Might be able to copy instead as an optimization
         IndirectDrawIndexedArgs[] args = new IndirectDrawIndexedArgs[1];
         args[0] = new IndirectDrawIndexedArgs
         {
@@ -50,7 +50,6 @@ public class GrassChunk
             startInstanceLocation = 0
         };
         commandBuffer.SetData(args);
-        
         
         // This should never be resized, so setting it here is fine
         lowLodCommandBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, sizeof(uint) * 5);
@@ -87,28 +86,31 @@ public class GrassChunk
         return new Bounds(chunkMin + chunkArea * 0.5f, chunkArea);
     }
     
-    
-    public void DrawChunk(ref ComputeShader grassComputeShader)
+    /// <summary>
+    /// This version calculates the position of grass blades in the chunk and which ones should be culled using a compute shader.
+    /// It also determines whether the blades for the entire chunk should be high LOD or low LOD.
+    /// </summary>
+    /// <param name="grassComputeShader">A reference to the compute shader we use for to calculate blade positions.</param>
+    public void CalculateAndDrawChunk(ref ComputeShader grassComputeShader, ref Vector3 cameraPos)
     {
         // Reset the buffer. A different amount may be culled this frame
         grassBuffer.SetCounterValue(0);
         
-        // TODO: These might not even need to be in the manager class, I might expand the chunk class instead
         grassComputeShader.SetBuffer(0, GrassBlades, grassBuffer);
         grassComputeShader.SetVector(StartPosition, bounds.min);
-        grassComputeShader.Dispatch(0, 1, 1, 1);
+        grassComputeShader.Dispatch(0, 4, 1, 4);
         
         
         //Vector3 cameraPos = mainCamera.transform.position;
         rp.matProps.SetBuffer(GrassBlades, grassBuffer);
         rp.worldBounds = bounds;
-        Vector3 cameraPos = SceneView.lastActiveSceneView.camera.transform.position;
         Vector3 nearestPoint = bounds.ClosestPoint(cameraPos);
         float distanceFromChunk = Vector3.Distance(nearestPoint, cameraPos);
 
         // This is set up in the GrassMaterial
         if (distanceFromChunk >= 25.0f) // low LOD
         {
+            isHighLOD = false;
             GraphicsBuffer.CopyCount(
                 grassBuffer,
                 lowLodCommandBuffer,
@@ -120,6 +122,7 @@ public class GrassChunk
         }
         else // high LOD
         {
+            isHighLOD = true;
             GraphicsBuffer.CopyCount(
                 grassBuffer,
                 commandBuffer,
@@ -128,6 +131,24 @@ public class GrassChunk
 
             rp.material = GrassChunkManager.grassMaterial;
             Graphics.RenderPrimitivesIndexedIndirect(rp, MeshTopology.Triangles, GrassChunkManager.highResIndexBuffer, commandBuffer);
+        }
+    }
+
+    /// <summary>
+    /// This draw method uses the previously set up append buffer to quickly render the chunk.
+    /// CalculateAndDrawChunk should have been called at least once before using this method so blade positioning is known.
+    /// </summary>
+    public void DrawChunk()
+    {
+        // We don't need to set back up any data or do new calculation. We just redraw the buffer.
+        if (isHighLOD) 
+        {
+            Graphics.RenderPrimitivesIndexedIndirect(rp, MeshTopology.Triangles, GrassChunkManager.highResIndexBuffer, commandBuffer);
+
+        }
+        else 
+        {
+            Graphics.RenderPrimitivesIndexedIndirect(rp, MeshTopology.Triangles, GrassChunkManager.lowResIndexBuffer, lowLodCommandBuffer);
         }
     }
 }
