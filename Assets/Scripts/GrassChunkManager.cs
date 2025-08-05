@@ -1,12 +1,6 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-using UnityEditor;
 using UnityEngine;
-using UnityEngine.AddressableAssets;
-using UnityEngine.ResourceManagement.AsyncOperations;
 using static UnityEngine.GraphicsBuffer;
 using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
@@ -25,7 +19,8 @@ public class GrassChunkManager : MonoBehaviour
     public static GraphicsBuffer highResIndexBuffer;
     public static GraphicsBuffer lowResIndexBuffer;
     private GraphicsBuffer grassDesc;
-    
+    [SerializeField] private Material grassMat;
+    [SerializeField] private Material lodMat;
     public float scale = 32;
     private float grassDist;
     public static float chunkSize;
@@ -40,7 +35,6 @@ public class GrassChunkManager : MonoBehaviour
     private Vector3 terrainSize;
     [SerializeField] private GrassShape grassShapeRange; 
     private static GrassShape grassShape;
-    private static bool materialsLoaded;
 
     
     // Camera reference
@@ -53,25 +47,8 @@ public class GrassChunkManager : MonoBehaviour
     private void Awake()
     {
 
-        LoadMaterials();
-    }
-    private async void LoadMaterials()
-    {
-        try
-        {
-            AsyncOperationHandle<Material> grassHandle = Addressables.LoadAssetAsync<Material>("Grass");
-            AsyncOperationHandle<Material> grassLODHandle = Addressables.LoadAssetAsync<Material>("GrassLOD");
-        
-            await Task.WhenAll(grassHandle.Task, grassLODHandle.Task);
-        
-            grassMaterial = grassHandle.Result;
-            grassLODMaterial = grassLODHandle.Result;
-            materialsLoaded = true;
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"Failed to load materials: {e.Message}");
-        }
+        grassMaterial = grassMat;
+        grassLODMaterial = lodMat;
     }
 
     private void Start()
@@ -133,14 +110,8 @@ public class GrassChunkManager : MonoBehaviour
         grassComputeShader.SetConstantBuffer(Shape, grassDesc, 0, 32);
     }
 
-    private async void InitializeChunks()
+    private void InitializeChunks()
     {
-        // We'll be pausing execution here until all the materials in the start method are loaded
-        while (!materialsLoaded)
-        {
-            await Task.Yield();
-        }
-        
         terrainPosition = terrain.transform.position;
         terrainSize = terrain.terrainData.size;
         

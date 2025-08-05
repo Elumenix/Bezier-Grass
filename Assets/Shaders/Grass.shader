@@ -43,6 +43,7 @@ Shader "Custom/Grass"
             Cull Off // disable back-face culling
             HLSLPROGRAM
             #define _SPECULAR_COLOR
+            #pragma target 5.0;
             #pragma vertex Vertex
             #pragma fragment Fragment
             #pragma multi_compile_instancing
