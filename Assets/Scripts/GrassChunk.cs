@@ -31,7 +31,7 @@ public class GrassChunk
     {
         coordinate = chunkCoord;
         bounds = GetChunkBounds();
-        grassBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Append, 4096, sizeof(float) * 12);
+        grassBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Append, 4096, sizeof(float) * 22);
         rp = new RenderParams(GrassChunkManager.grassMaterial)
         {
             matProps = new MaterialPropertyBlock()
@@ -85,12 +85,13 @@ public class GrassChunk
         Vector3 chunkArea = new Vector3(chunkSize, 20, chunkSize);
         return new Bounds(chunkMin + chunkArea * 0.5f, chunkArea);
     }
-    
+
     /// <summary>
     /// This version calculates the position of grass blades in the chunk and which ones should be culled using a compute shader.
     /// It also determines whether the blades for the entire chunk should be high LOD or low LOD.
     /// </summary>
     /// <param name="grassComputeShader">A reference to the compute shader we use for to calculate blade positions.</param>
+    /// <param name="cameraPos">Reference to the current camera so that the distance can be calculated for the correct LOD.</param>
     public void CalculateAndDrawChunk(ref ComputeShader grassComputeShader, ref Vector3 cameraPos)
     {
         // Reset the buffer. A different amount may be culled this frame

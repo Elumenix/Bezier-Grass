@@ -9,6 +9,7 @@ float4 frustumData[6];
 float scale;
 float grassDist;
 float3 startPosition;
+static const float3 up = float3(0,1,0);
 
 cbuffer GrassShape 
 {
@@ -45,12 +46,15 @@ bool isVisible(float3 bladePos)
 [numthreads(8,1,8)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    // Each thread handles 4 grass blades
+    // Each thread handles 4 grass blades so that less thread groups and threads are needed to fill the scene
     for (int i = 0; i < 4; i++)
     {
+        // PART 1:
+        // We first want to determine the position of each grass blade in the world, slightly randomized for good distribution.
+        // We also want to confirm if the grass blade is visible to the player, if not we don't need to do any more calculations on it.
+        
         // This doesn't quite line up, If I move to the middle, there's no guarantee of the same starting height
         // I'll need to find a solution to this later on so that it lines up with the terrain
-    
         float2 gridPos = startPosition.xz + float2(id.x * 4 + i, id.z * 4 + i) * grassDist; 
         float2 offsetPos = gridPos + rand2(gridPos) * grassDist; // Jitter point to prevent visible grid
         float3 worldPos = float3(offsetPos.x, startPosition.y, offsetPos.y);
@@ -59,6 +63,11 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // This also takes some of the write contention away from the buffer for this chunks shader call
         if (!isVisible(worldPos)) continue;
 
+
+        // PART 2:
+        // A voronoi noise map will be created in world space to partition the grass into groups.
+        // Values of the map will be used to alter the grass behavior in order to visually create natural grass clumps.
+        
         // Variables to set up the Voronoi Noise
         int _NumPoints = 10;
         float2 uv = (offsetPos  * _NumPoints) / scale;
@@ -99,6 +108,8 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         }
 
 
+        // PART 3:
+        // The position and voronoi will be used to generate random values that will be used to shape each grass blade
         // Use pcg hashes (based on this grass blades position) to get multiple random numbers quickly
         uint seed = worldPos.x + worldPos.z * 1000u;
         float random1 = pcg_float(seed + 0u);
@@ -107,18 +118,60 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float random4 = pcg_float(seed + 3u);
         float random5 = pcg_float(seed + 4u);
         //float random6 = pcg_float(seed + 5u);
+        
+        float bladeHeight = random1 * (height.y - height.x) + height.x;
+        float2 facing2D = normalize(float2(random2, random3) * 2.0f - 1); // Between -1 and 1
+        float bladeTilt = random4 * (tilt.y - tilt.x) + tilt.x;
+        float bladeBend = random5 * (bend.y - bend.x) + bend.x;
+        float3 facing = float3(facing2D.x, 0, facing2D.y);
+        float3 widthDir = float3(facing2D.y, 0, -facing2D.x); // Orthogonal normal to facing
 
-    
+        
+        // PART 4:
+        // Get the four control points of the Cubic Bézier Curve that will determine the blades shape
+        float3 p0 = float3(0,0,0); // Root of the grass blade in object space.
+        float3 p1 = p0 + up * (bladeHeight * bladeBend); // Above the starting point. Controls how rigid the base is.
+        float3 p3 = p0 + facing * bladeTilt + up * bladeHeight; // Endpoint is based on height and tilt.
+
+        float3 diff = p3 - p0;
+        float3 midPoint = 0.5f * diff;
+        float3 bladeDir = normalize(diff);
+        float3 awayDir = cross(-widthDir, bladeDir);
+
+        // Towards the middle and away from the blade. Predominantly controls how bent the blade is
+        float3 p2 = p0 + midPoint + awayDir * bladeBend;
+
+
+        // Wind is probably also better done at this point. I'll get back to that later
+        /*if (swaying == 1.0f) {
+            float phaseOffset = blade.height * 1.57;
+            float rawSpeedMult = 2.0 * (blade.height + 1.0) * (windStrength + 1.0);
+            float speedMult = round(rawSpeedMult); // Force to integer multiples, confirms loop
+            float maxAmplitude = 0.01 * (windStrength + 3.0);
+            float timeMod = _Time[1] % (2.0 * acos(-1.0));
+            p3 = p3 + sin(timeMod*speedMult + phaseOffset) * maxAmplitude * awayDir;
+            p2 = p2 + sin(timeMod*speedMult + 1.57 + phaseOffset) * maxAmplitude / 2.0 * awayDir;
+        }*/
+
+        // PART 5:
+        // Compute the coefficients for a Bézier curve evaluation
+        // Using the coefficients instead of the points will drastically cut down on the amount of math needed in the
+        // vertex shader for each grass blade as much of the following math can be simplified to the coefficients.
+        float3 c0 = p0;                        // Offset
+        float3 c1 = 3 * (p1 - p0);             // t
+        float3 c2 = 3 * (p0 - 2 * p1 + p2);    // t^2
+        float3 c3 = p3 - 3 * p2 + 3 * p1 - p0; // t^3
+
+
+        // PART 6:
+        // Put together the struct for the blade, then add it to the buffer so that the game will render it.
         GrassBlade blade;
         blade.position = worldPos;
-        blade.height = random1 * (height.y - height.x) + height.x;
         blade.nearestClumpPosition = float3(closestCell.x, 0, closestCell.y);
-        blade.facing = normalize(float2(random2, random3) * 2.0f - 1); // Between -1 and 1
         blade.width = -.2f;
-        blade.tilt = random4 * (tilt.y - tilt.x) + tilt.x;
-        blade.bend = random5 * (bend.y - bend.x) + bend.x;
-
-    
+        blade.widthDir = widthDir;
+        blade.coefficients = float4x3(c0, c1, c2, c3);
+        
         // Add this to the blades that will be rendered next frame
         grassBlades.Append(blade);
     }

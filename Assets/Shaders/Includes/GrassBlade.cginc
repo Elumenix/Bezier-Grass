@@ -2,16 +2,16 @@
 #define GRASSBLADE
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+// excluded shader from OpenGL ES 2.0 because it uses non-square matrices
+#pragma exclude_renderers gles
 
 struct GrassBlade
 {
     float3 position;
-    float width;
-    float height;
-    float2 facing;
-    float tilt;
-    float bend;
     float3 nearestClumpPosition;
+    float width;
+    float3 widthDir;
+    float4x3 coefficients;
 };
 
 struct Attributes
@@ -28,88 +28,70 @@ struct Varyings
     float2 uv : TEXCOORD2;
 };
 
-float4 _Color;
-float _Glossiness;
-float _Specular;
-float _Occlusion;
-float windStrength;
-float swaying;
+half4 _Color;
+half _Glossiness;
+half _Specular;
+half _Occlusion;
+half windStrength;
+half swaying;
 float2 _LodRange;
 
-void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 normalOS, out float3 widthDir)
+void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 normalOS)
 {
-    // Get some blade data
-    float3 up = float3(0,1,0);
-    float2 facing2D = blade.facing;
-    float3 facing = float3(facing2D.x, 0, facing2D.y);
-    widthDir = float3(facing2D.y, 0, -facing2D.x); // Orthogonal normal to facing
-
-    // STEP 1: Get the four control points of the cubic Bézier curve
-    // Root of the grass blade in object space
-    float3 p0 = float3(0,0,0);
+    // PART 1:
+    // Get the position of the point along the curve. The exact position of the control points for this blade of grass
+    // have already been computed in the compute shader and converted to coefficients. This was done so that every grass
+    // blade only needs to do this operation 1 time per chunk update, rather than for every vertex of the blade every frame.
+    float3 c0 = blade.coefficients[0];
+    float3 c1 = blade.coefficients[1];
+    float3 c2 = blade.coefficients[2];
+    float3 c3 = blade.coefficients[3];
     
-    // Endpoint is based on height and tilt
-    float3 p3 = p0 + facing * blade.tilt + up * blade.height;
-    
-    // Above the starting point. How long until bending starts a lot more
-    float3 p1 = p0 + up * (blade.height * blade.bend);
-
-    float3 diff = p3 - p0;
-    float3 midPoint = 0.5f * diff;
-    float3 bladeDir = normalize(diff);
-    float3 awayDir = cross(-widthDir, bladeDir);
-
-    // Towards the middle and away from the blade. Predominantly controls bend and shape of the blade
-    float3 p2 = (p0 + midPoint) + awayDir * blade.bend;
-
-
-    // STEP 2: Adjust the curve to simulate wind if appropriate
-    // Perlin noise will be used instead of this, but this is a good test for grass flexibility
-    if (swaying == 1.0f) {
-        float phaseOffset = blade.height * 1.57;
-        float rawSpeedMult = 2.0 * (blade.height + 1.0) * (windStrength + 1.0);
-        float speedMult = round(rawSpeedMult); // Force to integer multiples, confirms loop
-        float maxAmplitude = 0.01 * (windStrength + 3.0);
-        float timeMod = _Time[1] % (2.0 * acos(-1.0));
-        p3 = p3 + sin(timeMod*speedMult + phaseOffset) * maxAmplitude * awayDir;
-        p2 = p2 + sin(timeMod*speedMult + 1.57 + phaseOffset) * maxAmplitude / 2.0 * awayDir;
-    }
-
-
-    // STEP 3: Get the correct position for each vertex on the Bézier curve
-    // compute coefficients for a more efficient bezier calculation
-    float3 c0 = p0;                        // Offset
-    float3 c1 = 3 * (p1 - p0);             // t
-    float3 c2 = 3 * (p0 - 2 * p1 + p2);    // t^2
-    float3 c3 = p3 - 3 * p2 + 3 * p1 - p0; // t^3
-    
-    // Get the correct point along the Bézier curve
+    // Get the correct point along the Bézier curve. Using mad operations as an optimization
     // float3 pos = c3t^3 + c2t^2 + c1t + c0
     // float3 pos = ((c3 * t + c2) * t + c1) * t + c0;
     pos = mad(mad(mad(c3, t, c2), t, c1), t, c0);
 
-    
-    // STEP 4: Get the derivative of the cubic Bézier curve in order to find the normals
-    // The derivative of a cubic Bézier curve is a quadratic Bézier curve
-    // Quadratic Bézier curve control points
-    float3 d0 = 3 * (p1 - p0);
-    float3 d1 = 3 * (p2 - p1);
-    float3 d2 = 3 * (p3 - p2);
 
-    // Coefficients
-    float3 cd0 = d0;                 // Offset
-    float3 cd1 = 2 * (d1-d0);        // t
-    float3 cd2 = d0 - (2 * d1) + d2; // t^2
+    // PART 2:
+    // Now we need to get the derivative of the cubic Bézier curve in order to get the proper normal for the blade of grass.
+    // The derivative of a cubic Bézier curve is a quadratic Bézier curve, which we can easily calculate and simplify for.
+    // Most of this section is me showing how the math simplifies from control points all the way down to derivative coefficients.
 
-    float3 derivative = mad(mad(cd2, t, cd1), t, cd0);
+    // (A)
+    // This is a representation of the control points of the quadratic Bézier curve derived from the cubic control points.
+    // d0 = 3(p1 - p0);
+    // d1 = 3(p2 - p1);
+    // d2 = 3(p3 - p2);
+
+    // (B)
+    // Simplifying to derivative control points by substituting (A) with the cubic coefficients.
+    // d0 = c1;
+    // d1 = c1+c2;
+    // d2 = 3c3 + 2c2 + c1
+
+    // (C)
+    // Coefficients for the quadratic Bézier curve made by directly breaking (A) into its components.
+    // dc0 = d0;            // Offset
+    // dc1 = 2(d1-d0);      // t
+    // dc2 = d0 - 2d1 + d2; // t^2
+
+    // (D)
+    // Coefficients for the quadratic Bézier curve substituting the equations in (C) with the values from (B).
+    float3 dc0 = c1;     // Offset
+    float3 dc1 = 2 * c2; // t
+    float3 dc2 = 3 * c3; // t^2
+
+    // Similar mad operations are used again for the derivative point as an optimization
+    float3 derivative = mad(mad(dc2, t, dc1), t, dc0);
     float3 tangentVec = normalize(derivative);
-    normalOS = cross(tangentVec, widthDir);
+    normalOS = cross(tangentVec, blade.widthDir);
 }
 
-float4 CalculateGrassLighting(Varyings input)
+half4 CalculateGrassLighting(Varyings input)
 {
     // Setting up some data ahead of time
-    float3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
+    half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
     float3 normalDirWS = normalize(input.normalWS);
                 
     // Because we're doing cull off and making the mesh double-sided that way, we need to actually know whether
@@ -138,8 +120,7 @@ float4 CalculateGrassLighting(Varyings input)
     surfaceData.occlusion = _Occlusion;
                 
     // Apply PBR Lighting
-    float4 pbr = UniversalFragmentPBR(lightData, surfaceData);
-    return pbr;
+    return UniversalFragmentPBR(lightData, surfaceData);
 }
 
 #endif

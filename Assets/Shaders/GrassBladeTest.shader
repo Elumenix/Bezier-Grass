@@ -65,7 +65,7 @@ Shader "Custom/GrassBladeTest"
             void Vertex(Attributes input, out Varyings o)
             {
                 GrassBlade blade = _BladeBuffer[0];
-                blade.facing = normalize(hash * 2 - float2(1,1));
+                //blade.facing = normalize(hash * 2 - float2(1,1));
 
                 // We're precomputing ArcT instead of doing an expensive arc length perameterization calculation in the vertex shader
                 // There's no closed form solution for arc length parameterization for cubic beziers, so this is much easier
@@ -75,14 +75,13 @@ Shader "Custom/GrassBladeTest"
             
                 float3 pos;
                 float3 normalOS;
-                float3 widthDir;
-                CalculateBezierCurve(blade, t, pos, normalOS, widthDir);
+                CalculateBezierCurve(blade, t, pos, normalOS);
                 
                 // Blade will get skinnier the further up it goes, with point 14 (the last one) being along the center
                 //float sideOffset = blade.width - ((blade.width / 7.0) * (vertex / 2));
                 float sideOffset = blade.width - (blade.width * t*t);
                 int odd = (vertex % 2) * 2 - 1; // -1 or 1
-                pos += widthDir * sideOffset * odd;
+                pos += blade.widthDir * sideOffset * odd;
 
                 VertexPositionInputs positionInputs = GetVertexPositionInputs(pos);
                 o.positionCS = positionInputs.positionCS;

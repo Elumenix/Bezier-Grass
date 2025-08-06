@@ -26,7 +26,7 @@ Shader "Custom/GrassLOD"
 
         // All data for grass shape is stored on the cpu for efficiency rather than needing to be passed every frame
         // This also means that all instances of this shader share this data rather than every chunk/instance needing it's own version
-        static const float arcTBuffer[4] = { 0.001f, 0.5f, 0.8f, 1.0f };
+        static const half arcTBuffer[4] = { 0.001f, 0.5f, 0.8f, 1.0f };
         StructuredBuffer<GrassBlade> grassBlades; // From the compute shader
         ENDHLSL
         
@@ -57,17 +57,16 @@ Shader "Custom/GrassLOD"
                 // There's no closed form solution for arc length parameterization for cubic bezier curves, so this is much easier
                 uint vertex = input.vertexID;
                 uint pair = vertex / 2;
-                float t = arcTBuffer[pair];
+                half t = arcTBuffer[pair];
 
                 float3 pos;
                 float3 normalOS;
-                float3 widthDir;
-                CalculateBezierCurve(blade, t, pos, normalOS, widthDir);
+                CalculateBezierCurve(blade, t, pos, normalOS);
             
                 // Blade will get skinnier the further up it goes, with point 14 (the last one) being along the center
                 float sideOffset = blade.width - (blade.width * t * t);
                 int odd = (vertex % 2) * 2 - 1; // -1 or 1
-                pos += widthDir * sideOffset * odd;
+                pos += blade.widthDir * sideOffset * odd;
 
                 // Passing data to the fragment shader
                 float3 positionWS = TransformObjectToWorld(pos) + blade.position;
@@ -78,9 +77,9 @@ Shader "Custom/GrassLOD"
                 o.uv = float2(vertex == 6 ? .5 : vertex % 2, t);
             }
 
-            float4 Fragment(Varyings input) : SV_Target 
+            half4 Fragment(Varyings input) : SV_Target 
             {
-                float4 pbr = CalculateGrassLighting(input);
+                half4 pbr = CalculateGrassLighting(input);
                 return pbr;
             }
             ENDHLSL
