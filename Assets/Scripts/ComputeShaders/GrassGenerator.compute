@@ -6,6 +6,7 @@
 AppendStructuredBuffer<GrassBlade> grassBlades;
 
 float4 frustumData[6];
+int numPoints;
 float scale;
 float grassDist;
 float3 startPosition;
@@ -69,10 +70,9 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // Values of the map will be used to alter the grass behavior in order to visually create natural grass clumps.
         
         // Variables to set up the Voronoi Noise
-        int _NumPoints = 10;
-        float2 uv = (offsetPos  * _NumPoints) / scale;
+        float2 uv = (offsetPos  * numPoints) / scale; // offset Pos means a full voronoi map is per tile instead of world
         float2 baseCell = floor(uv);
-        float minDistToCell = 10.0;
+        float minDistToCell = 100.0;
         float2 closestCell;
     
         // Voronoi Noise Implementation
@@ -83,18 +83,18 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             for (int y = -1; y <= 1; y++)
             {
                 float2 cell = baseCell + float2(x,y);
-                float2 wrappedCell = fmod(cell + _NumPoints, _NumPoints);
+                float2 wrappedCell = fmod(cell + numPoints, numPoints);
                         
                 float2 cellPosition = wrappedCell + rand2(wrappedCell);
                 float2 diff = cellPosition - uv;
 
 
                 float2 wrappedDiff = diff;
-                if (abs(diff.x) > _NumPoints * 0.5) {
-                    wrappedDiff.x = diff.x - sign(diff.x) * _NumPoints;
+                if (abs(diff.x) > numPoints * 0.5) {
+                    wrappedDiff.x = diff.x - sign(diff.x) * numPoints;
                 }
-                if (abs(diff.y) > _NumPoints * 0.5) {
-                    wrappedDiff.y = diff.y - sign(diff.y) * _NumPoints;
+                if (abs(diff.y) > numPoints * 0.5) {
+                    wrappedDiff.y = diff.y - sign(diff.y) * numPoints;
                 }
 
             
@@ -106,6 +106,8 @@ void CSMain (uint3 id : SV_DispatchThreadID)
                 }
             }
         }
+
+        float2 voronoiCell = (closestCell * scale) / numPoints;
 
 
         // PART 3:
@@ -120,7 +122,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         //float random6 = pcg_float(seed + 5u);
         
         float bladeHeight = random1 * (height.y - height.x) + height.x;
-        float2 facing2D = normalize(float2(random2, random3) * 2.0f - 1); // Between -1 and 1
+        float2 facing2D = normalize(voronoiCell - offsetPos); //normalize(float2(random2, random3) * 2.0f - 1); // Between -1 and 1
         float bladeTilt = random4 * (tilt.y - tilt.x) + tilt.x;
         float bladeBend = random5 * (bend.y - bend.x) + bend.x;
         float3 facing = float3(facing2D.x, 0, facing2D.y);

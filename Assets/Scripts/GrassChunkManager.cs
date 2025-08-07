@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using UnityEditor;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 using Vector2 = UnityEngine.Vector2;
@@ -10,6 +11,7 @@ public class GrassChunkManager : MonoBehaviour
     [Header("Terrain Setup")]
     [SerializeField] private Terrain terrain;
     [Range(1, 128)] public int chunksPerSide;
+    [Range(0, 128)] public int numPoints;
     
     [Header("Grass Settings")]
     public static Material grassMaterial;
@@ -43,6 +45,7 @@ public class GrassChunkManager : MonoBehaviour
     private static readonly int Scale = Shader.PropertyToID("scale");
     private static readonly int GrassDist = Shader.PropertyToID("grassDist");
     private static readonly int FrustumData = Shader.PropertyToID("frustumData");
+    private static readonly int NumPoints = Shader.PropertyToID("numPoints");
 
     private void Awake()
     {
@@ -122,6 +125,7 @@ public class GrassChunkManager : MonoBehaviour
         // At this point, some information based on chunk positioning for the compute shader will be set and stay unchanged
         grassComputeShader.SetFloat(Scale, scale);
         grassComputeShader.SetFloat(GrassDist, grassDist);
+        grassComputeShader.SetFloat(NumPoints, numPoints);
         
         // Set up chunk tracking 
         totalChunkCount = new Vector2Int(chunksPerSide, chunksPerSide);
@@ -170,6 +174,11 @@ public class GrassChunkManager : MonoBehaviour
             frustumData[i * 4 + 3] = frustumPlanes[i].distance;
         }
         grassComputeShader.SetFloats(FrustumData, frustumData);
+        grassComputeShader.SetFloat(Scale, scale);
+        grassComputeShader.SetFloat(NumPoints, numPoints);
+
+        Vector3 cameraPos = SceneView.lastActiveSceneView.camera.transform.position; //mainCamera.transform.position;
+        
         
         
         // See if we should render each active chunk
@@ -180,7 +189,8 @@ public class GrassChunkManager : MonoBehaviour
             // lets us skip the compute shader call, which should speed up the program
             if (GeometryUtility.TestPlanesAABB(frustumPlanes, chunk.bounds))
             {
-                chunk.DrawChunk();
+                chunk.CalculateAndDrawChunk(ref grassComputeShader,ref cameraPos);
+                //chunk.DrawChunk();
             }
         }
     }

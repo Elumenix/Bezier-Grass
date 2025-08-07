@@ -32,6 +32,7 @@ half4 _Color;
 half _Glossiness;
 half _Specular;
 half _Occlusion;
+half _ViewAdj;
 half windStrength;
 half swaying;
 float2 _LodRange;
@@ -93,14 +94,15 @@ half4 CalculateGrassLighting(Varyings input)
     // Setting up some data ahead of time
     half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
     float3 normalDirWS = normalize(input.normalWS);
-                
+
+    // This code may be causing problems, temporarily disabling it.
     // Because we're doing cull off and making the mesh double-sided that way, we need to actually know whether
     // we're looking at the front or back of the mesh currently so that the same lighting isn't used for both sides
-    float facing = dot(input.normalWS, viewDirWS);
+    /*float facing = dot(input.normalWS, viewDirWS);
     if (facing < 0)
     {
         normalDirWS = -normalDirWS;
-    }
+    }*/
                 
     // Set data needed to calculate lighting
     InputData lightData = (InputData)0;
