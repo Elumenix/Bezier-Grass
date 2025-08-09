@@ -30,7 +30,7 @@ struct Varyings
 
 half4 _Color;
 half _Glossiness;
-half _Specular;
+half _Metallic;
 half _Occlusion;
 half _ViewAdj;
 half windStrength;
@@ -89,6 +89,22 @@ void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 
     normalOS = cross(tangentVec, blade.widthDir);
 }
 
+float viewSpaceAdjustment(GrassBlade blade, float3 pos, float3 normalOS, float t)
+{
+    // Create a view space projection to thicken grass blades as they become orthogonal to the camera
+    // The goal here is to make it so that blades don't as obviously thin and disappear when viewed from the side
+    float3 positionWS = TransformObjectToWorld(pos) + blade.position;
+    float3 viewDirWS = normalize(_WorldSpaceCameraPos - positionWS);
+    float3 grassFaceNormalWS = normalize(TransformObjectToWorld(normalOS));
+    float viewDotNormal = saturate(dot(grassFaceNormalWS, viewDirWS));
+    float viewSpaceThickenFactor = pow(1.0 - viewDotNormal, 4.0) * smoothstep(0.0, 0.2, viewDotNormal);
+                
+    // Apply view-space thickening to the blade width
+    float baseWidth = blade.width - (blade.width * t * t);
+    float thickenedWidth = baseWidth * (1.0 + viewSpaceThickenFactor * 2.0);
+    return thickenedWidth;
+}
+
 half4 CalculateGrassLighting(Varyings input)
 {
     // Setting up some data ahead of time
@@ -98,11 +114,11 @@ half4 CalculateGrassLighting(Varyings input)
     // This code may be causing problems, temporarily disabling it.
     // Because we're doing cull off and making the mesh double-sided that way, we need to actually know whether
     // we're looking at the front or back of the mesh currently so that the same lighting isn't used for both sides
-    /*float facing = dot(input.normalWS, viewDirWS);
+    float facing = dot(input.normalWS, viewDirWS);
     if (facing < 0)
     {
         normalDirWS = -normalDirWS;
-    }*/
+    }
                 
     // Set data needed to calculate lighting
     InputData lightData = (InputData)0;
@@ -110,7 +126,9 @@ half4 CalculateGrassLighting(Varyings input)
     lightData.normalWS = normalDirWS;
     lightData.viewDirectionWS = viewDirWS;
     lightData.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
-    lightData.bakedGI = SampleSH(lightData.normalWS); 
+    lightData.bakedGI = SampleSH(lightData.normalWS);
+    lightData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
+    lightData.vertexLighting = VertexLighting(input.positionWS, normalDirWS);
                 
     // Surface data is for additional data from textures. 
     SurfaceData surfaceData;
@@ -118,7 +136,7 @@ half4 CalculateGrassLighting(Varyings input)
     surfaceData.albedo = _Color.rgb;
     surfaceData.alpha = 1.0;
     surfaceData.smoothness = _Glossiness;
-    surfaceData.specular = _Specular;
+    surfaceData.metallic = _Metallic;
     surfaceData.occlusion = _Occlusion;
                 
     // Apply PBR Lighting

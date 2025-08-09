@@ -5,7 +5,7 @@ Shader "Custom/GrassLOD"
         [Header(Property Settings)]
         _Color ("Color", Color) = (1,1,1,1)
         _Glossiness ("Smoothness", Range(0,1.0)) = 0.5
-        _Specular ("Specular", Range(0,1.0)) = 0.0
+        _Metallic ("Metallic", Range(0,1.0)) = 0.0
         _Occlusion ("Occlusion", Range(0,1.0)) = 1.0
         _ViewAdj ("View Space Adjustment", Range(0.0,1.0)) = 0.0
         
@@ -63,29 +63,18 @@ Shader "Custom/GrassLOD"
                 float3 pos;
                 float3 normalOS;
                 CalculateBezierCurve(blade, t, pos, normalOS);
+                float thickenedWidth = viewSpaceAdjustment(blade, pos, normalOS, t);
 
-                // Create a view space projection to thicken grass blades as they become orthogonal to the camera
-                // The goal here is to make it so that blades don't as obviously thin and disappear when viewed from the side
-                float3 positionWS = TransformObjectToWorld(pos) + blade.position;
-                float3 viewDirWS = normalize(_WorldSpaceCameraPos - positionWS);
-                float3 grassFaceNormalWS = normalize(TransformObjectToWorld(normalOS));
-                float viewDotNormal = saturate(dot(grassFaceNormalWS, viewDirWS));
-                float viewSpaceThickenFactor = pow(1.0 - viewDotNormal, 4.0) * smoothstep(0.0, 0.2, viewDotNormal);
-                
-                // Apply view-space thickening to the blade width
-                float baseWidth = blade.width - (blade.width * t * t);
-                float thickenedWidth = baseWidth * (1.0 + viewSpaceThickenFactor * 2.0); 
-            
                 // Blade will get skinnier the further up it goes, with point 14 (the last one) being along the center
                 float sideOffset = lerp(blade.width - (blade.width * t * t), thickenedWidth, _ViewAdj);
                 int odd = (vertex % 2) * 2 - 1; // -1 or 1
                 pos += blade.widthDir * sideOffset * odd;
 
                 // Passing data to the fragment shader
-                positionWS = TransformObjectToWorld(pos) + blade.position;
+                float3 positionWS = TransformObjectToWorld(pos) + blade.position;
                 o.positionCS = TransformWorldToHClip(positionWS);
                 o.positionWS = positionWS;
-                o.normalWS = TransformObjectToWorld(normalOS);
+                o.normalWS = normalize(TransformObjectToWorldNormal(normalOS));
                 o.vertexID = vertex;
                 o.uv = float2(vertex == 6 ? .5 : vertex % 2, t);
             }

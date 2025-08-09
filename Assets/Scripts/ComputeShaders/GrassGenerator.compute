@@ -122,7 +122,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         //float random6 = pcg_float(seed + 5u);
         
         float bladeHeight = random1 * (height.y - height.x) + height.x;
-        float2 facing2D = normalize(voronoiCell - offsetPos); //normalize(float2(random2, random3) * 2.0f - 1); // Between -1 and 1
+        float2 facing2D = /*normalize(voronoiCell - offsetPos);*/ normalize(float2(random2, random3) * 2.0f - 1); // Between -1 and 1
         float bladeTilt = random4 * (tilt.y - tilt.x) + tilt.x;
         float bladeBend = random5 * (bend.y - bend.x) + bend.x;
         float3 facing = float3(facing2D.x, 0, facing2D.y);
@@ -138,7 +138,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float3 diff = p3 - p0;
         float3 midPoint = 0.5f * diff;
         float3 bladeDir = normalize(diff);
-        float3 awayDir = cross(-widthDir, bladeDir);
+        float3 awayDir = normalize(cross(-widthDir, bladeDir));
 
         // Towards the middle and away from the blade. Predominantly controls how bent the blade is
         float3 p2 = p0 + midPoint + awayDir * bladeBend;
