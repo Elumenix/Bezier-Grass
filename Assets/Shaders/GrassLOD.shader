@@ -7,7 +7,10 @@ Shader "Custom/GrassLOD"
         _Glossiness ("Smoothness", Range(0,1.0)) = 0.5
         _Metallic ("Metallic", Range(0,1.0)) = 0.0
         _Occlusion ("Occlusion", Range(0,1.0)) = 1.0
-        _ViewAdj ("View Space Adjustment", Range(0.0,1.0)) = 0.0
+        
+        [Header(Camera View Space Projection Settings)]
+        _AdjustmentThreshold ("Adjustment Threshold", Range(0.0,1.0)) = 0.25
+        _AdjustmentStrength ("Adjustment Strength", Range(0.0,1.0)) = 0.75
         
         [Header(Blade Behavior)]
         [Toggle] swaying ("Sway Blade", Float) = 0
@@ -61,14 +64,16 @@ Shader "Custom/GrassLOD"
                 half t = arcTBuffer[pair];
 
                 float3 pos;
-                float3 normalOS;
-                CalculateBezierCurve(blade, t, pos, normalOS);
-                float thickenedWidth = viewSpaceAdjustment(blade, pos, normalOS, t);
-
+                float3 tangentVec;
+                CalculateBezierCurve(blade, t, pos, tangentVec);
+            
                 // Blade will get skinnier the further up it goes, with point 14 (the last one) being along the center
-                float sideOffset = lerp(blade.width - (blade.width * t * t), thickenedWidth, _ViewAdj);
+                float sideOffset = blade.width - (blade.width * t * t);
                 int odd = (vertex % 2) * 2 - 1; // -1 or 1
-                pos += blade.widthDir * sideOffset * odd;
+
+                float3 widthDir = viewSpaceAdjustment(blade, pos, tangentVec);
+                pos += widthDir * sideOffset * odd;
+                float3 normalOS = cross(tangentVec, widthDir);
 
                 // Passing data to the fragment shader
                 float3 positionWS = TransformObjectToWorld(pos) + blade.position;

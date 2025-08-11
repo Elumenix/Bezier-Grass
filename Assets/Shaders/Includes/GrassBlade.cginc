@@ -1,9 +1,10 @@
 #ifndef GRASSBLADE
+// Upgrade NOTE: excluded shader from OpenGL ES 2.0 because it uses non-square matrices
+#pragma exclude_renderers gles
 #define GRASSBLADE
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-// excluded shader from OpenGL ES 2.0 because it uses non-square matrices
-#pragma exclude_renderers gles
+
 
 struct GrassBlade
 {
@@ -36,8 +37,10 @@ half _ViewAdj;
 half windStrength;
 half swaying;
 float2 _LodRange;
+float _AdjustmentThreshold;
+float _AdjustmentStrength;
 
-void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 normalOS)
+void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 tangentVec)
 {
     // PART 1:
     // Get the position of the point along the curve. The exact position of the control points for this blade of grass
@@ -85,24 +88,28 @@ void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 
 
     // Similar mad operations are used again for the derivative point as an optimization
     float3 derivative = mad(mad(dc2, t, dc1), t, dc0);
-    float3 tangentVec = normalize(derivative);
-    normalOS = cross(tangentVec, blade.widthDir);
+    tangentVec = normalize(derivative);
 }
 
-float viewSpaceAdjustment(GrassBlade blade, float3 pos, float3 normalOS, float t)
+float3 viewSpaceAdjustment(GrassBlade blade, float3 pos, float3 tangentVec)
 {
-    // Create a view space projection to thicken grass blades as they become orthogonal to the camera
-    // The goal here is to make it so that blades don't as obviously thin and disappear when viewed from the side
-    float3 positionWS = TransformObjectToWorld(pos) + blade.position;
-    float3 viewDirWS = normalize(_WorldSpaceCameraPos - positionWS);
-    float3 grassFaceNormalWS = normalize(TransformObjectToWorld(normalOS));
-    float viewDotNormal = saturate(dot(grassFaceNormalWS, viewDirWS));
-    float viewSpaceThickenFactor = pow(1.0 - viewDotNormal, 4.0) * smoothstep(0.0, 0.2, viewDotNormal);
-                
-    // Apply view-space thickening to the blade width
-    float baseWidth = blade.width - (blade.width * t * t);
-    float thickenedWidth = baseWidth * (1.0 + viewSpaceThickenFactor * 2.0);
-    return thickenedWidth;
+    // Direction the camera is pointing
+    float3 cameraDir = normalize(_WorldSpaceCameraPos - (pos + blade.position));
+            
+    // Calculate blade facing (0 = Edge towards camera (Invisible), 1 = Exactly facing camera)
+    float edgeAngle = 1.0 - abs(dot(cameraDir, blade.widthDir));
+
+    // Linear blend from adjustmentThreshold to 1.0
+    float adjustAmount = saturate((_AdjustmentThreshold - edgeAngle) / _AdjustmentThreshold);
+
+    // Determines the percentage that the blade will be rotated from its base rotation to the camera
+    adjustAmount *= _AdjustmentStrength;
+            
+    // Project the faces to point towards the camera 
+    float3 cameraFacingWidthDir = normalize(cross(cameraDir, tangentVec));
+
+    // Interpolate between innate facing and camera facing based on the adjustAmount
+    return lerp(blade.widthDir, cameraFacingWidthDir, adjustAmount);
 }
 
 half4 CalculateGrassLighting(Varyings input)
