@@ -129,6 +129,11 @@ public class GrassChunkManager : MonoBehaviour
         totalChunkCount = new Vector2Int(chunksPerSide, chunksPerSide);
         activeChunks = new GrassChunk[totalChunkCount.x * totalChunkCount.y];
         Vector3 cameraPos = mainCamera.transform.position;//SceneView.lastActiveSceneView.camera.transform.position;
+        
+        // Padding is added to the width because the way grass blades are rotated and sized means they can extend outside
+        // the strict chunk boundaries. This would cause some very visible culling as you turn away from or walk between chunks.
+        // Padding is based on the grassShape parameters because it specifies the max height and reach of the blades
+        Vector3 chunkPadding = new(grassShape.tilt.y, grassShape.height.y, grassShape.tilt.y);
 
         int i = 0;
         for (int x = 0; x < chunksPerSide; x++)
@@ -136,7 +141,7 @@ public class GrassChunkManager : MonoBehaviour
             for (int z = 0; z < chunksPerSide; z++)
             {
                 Vector2Int coord = new Vector2Int(x, z);
-                GrassChunk chunk = new GrassChunk(coord);
+                GrassChunk chunk = new GrassChunk(coord, ref chunkPadding);
                 
                 // Immediately Call to fill the graphics buffers
                 chunk.CalculateAndDrawChunk(ref grassComputeShader, ref cameraPos);
@@ -214,21 +219,6 @@ public class GrassChunkManager : MonoBehaviour
         foreach (GrassChunk chunk in activeChunks)
         {
             chunk?.Dispose();
-        }
-    }
-    
-    // Debug visualization
-    void OnDrawGizmosSelected()
-    {
-        if (!Application.isPlaying) return;
-        if (terrain == null) return;
-        
-        
-        // Draw active chunks
-        Gizmos.color = Color.green;
-        foreach (GrassChunk chunk in activeChunks)
-        {
-            Gizmos.DrawWireCube(chunk.bounds.center, chunk.bounds.size);
         }
     }
 }

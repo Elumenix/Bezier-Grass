@@ -21,16 +21,17 @@ public class GrassChunk
     private readonly GraphicsBuffer lowLodCommandBuffer;
     private RenderParams rp;
     private bool isHighLOD;
+    private Vector3 chunkStart;
     
     // Saved shader property to prevent string lookup
     private static readonly int StartPosition = Shader.PropertyToID("startPosition");
     private static readonly int GrassBlades = Shader.PropertyToID("grassBlades");
 
 
-    public GrassChunk(Vector2Int chunkCoord)
+    public GrassChunk(Vector2Int chunkCoord, ref Vector3 chunkPadding)
     {
         coordinate = chunkCoord;
-        bounds = GetChunkBounds();
+        bounds = GetChunkBounds(ref chunkPadding);
         grassBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Append, 4096, sizeof(float) * 22);
         rp = new RenderParams(GrassChunkManager.grassMaterial)
         {
@@ -64,9 +65,8 @@ public class GrassChunk
         lowLodCommandBuffer.Release();
     }
     
-    private Bounds GetChunkBounds()
+    private Bounds GetChunkBounds(ref Vector3 chunkPadding)
     {
-        // TODO: When getting to culling, we'll probably have offsets so we need to make sure the chunk is expanded a little to prevent premature culling
         // TODO: This works for flat terrain currently, vertical bounds may need to change when adding hills
 
         // We'll reuse this variable a few times, so we'll put it on the local stack
@@ -74,16 +74,16 @@ public class GrassChunk
         
         // Because unity's procedural instancing function still requires a bounds, we set it to the bounds for the chunk
         // The function treats rendering as all grass blades or no grass blades, so we make sure the bounds covers the whole chunk
-        Vector3 chunkMin = GrassChunkManager.terrainPosition + new Vector3(
-            coordinate.x * chunkSize,
-            0,
-            coordinate.y * chunkSize
-        );
+        chunkStart = GrassChunkManager.terrainPosition + new Vector3(coordinate.x * chunkSize, 0, coordinate.y * chunkSize);
+        Vector3 chunkEnd = chunkStart + new Vector3(chunkSize, 0, chunkSize);
+        Vector3 chunkCenter = (chunkStart + chunkEnd) * 0.5f;
         
-        // TODO: 20 is definitely too large, figure out a better number when we get proper scales set up
-        // Grass blades vertical height also needs to fit the chunk to prevent culling (20 is a pretty safe number)
-        Vector3 chunkArea = new Vector3(chunkSize, 20, chunkSize);
-        return new Bounds(chunkMin + chunkArea * 0.5f, chunkArea);
+        // Padding is added to the width because the way grass blades are rotated and sized means they can extend outside
+        // the strict chunk boundaries. This would cause some very visible culling as you turn away from or walk between chunks.
+        // Padding is based on the grassShape parameters because it specifies the max height and reach of the blades
+        Vector3 chunkWidth = (chunkEnd - chunkStart) * 0.5f + chunkPadding;
+
+        return new Bounds(chunkCenter, chunkWidth * 2);
     }
 
     /// <summary>
@@ -98,7 +98,7 @@ public class GrassChunk
         grassBuffer.SetCounterValue(0);
         
         grassComputeShader.SetBuffer(0, GrassBlades, grassBuffer);
-        grassComputeShader.SetVector(StartPosition, bounds.min);
+        grassComputeShader.SetVector(StartPosition, chunkStart);
         grassComputeShader.Dispatch(0, 4, 1, 4);
         
         
