@@ -39,6 +39,8 @@ half swaying;
 float2 _LodRange;
 float _AdjustmentThreshold;
 float _AdjustmentStrength;
+float _NormalCurvature;
+
 
 void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 tangentVec)
 {

@@ -7,6 +7,7 @@ Shader "Custom/Grass"
         _Glossiness ("Smoothness", Range(0,1.0)) = 0.5
         _Metallic ("Metallic", Range(0,1.0)) = 0.0
         _Occlusion ("Occlusion", Range(0,1.0)) = 1.0
+        _NormalCurvature ("Normal Curve", Range(0.0, 1.0)) = 0.5
         
         [Header(Camera View Space Projection Settings)]
         _AdjustmentThreshold ("Adjustment Threshold", Range(0.0,1.0)) = 0.25
@@ -80,19 +81,26 @@ Shader "Custom/Grass"
             
                 float3 widthDir = viewSpaceAdjustment(blade, pos, tangentVec);
                 pos += widthDir * sideOffset * odd;
-                float3 normalOS = cross(tangentVec, widthDir);
+
+                // Normals are rounded so that the blades don't look as flat and reflet light better
+                float3 GeometricNormalOS = cross(tangentVec, widthDir);
+                float normalizedWidth = sideOffset / blade.width;
+                float3 roundingOffset = widthDir * odd * normalizedWidth * _NormalCurvature;
+                float3 roundedNormal = normalize(GeometricNormalOS + roundingOffset);
+
 
                 // Passing data to the fragment shader
                 float3 positionWS = TransformObjectToWorld(pos) + blade.position;
                 o.positionCS = TransformWorldToHClip(positionWS);
                 o.positionWS = positionWS;
-                o.normalWS = normalize(TransformObjectToWorldNormal(normalOS));
+                o.normalWS = normalize(TransformObjectToWorldNormal(roundedNormal));
                 o.vertexID = vertex;
                 o.uv = float2(vertex == 14 ? .5 : vertex % 2, t);
             }
 
             half4 Fragment(Varyings input) : SV_Target 
             {
+                //return float4(input.normalWS.xyz, 1);
                 half4 pbr = CalculateGrassLighting(input);
                 return pbr;
             }
