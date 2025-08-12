@@ -6,7 +6,7 @@
 AppendStructuredBuffer<GrassBlade> grassBlades;
 
 float4 frustumData[6];
-int numPoints;
+uint patternSize;
 float scale;
 float grassDist;
 float3 startPosition;
@@ -70,10 +70,10 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // Values of the map will be used to alter the grass behavior in order to visually create natural grass clumps.
         
         // Variables to set up the Voronoi Noise
-        float2 uv = (offsetPos  * numPoints) / scale; // offset Pos means a full voronoi map is per tile instead of world
+        float2 uv = offsetPos / scale; // offset Pos means a full voronoi map is per tile instead of world
         float2 baseCell = floor(uv);
-        float minDistToCell = 100.0;
-        float2 closestCell;
+        float minDistUV = 100000.0; // Larger than any possible cell
+        float2 closestCellPos;
     
         // Voronoi Noise Implementation
         [unroll]
@@ -83,31 +83,34 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             for (int y = -1; y <= 1; y++)
             {
                 float2 cell = baseCell + float2(x,y);
-                float2 wrappedCell = fmod(cell + numPoints, numPoints);
+                float2 wrappedCell = fmod(cell + patternSize, patternSize);
                         
-                float2 cellPosition = wrappedCell + rand2(wrappedCell);
+                float2 cellPosition = cell + rand2(wrappedCell);
                 float2 diff = cellPosition - uv;
 
 
-                float2 wrappedDiff = diff;
-                if (abs(diff.x) > numPoints * 0.5) {
-                    wrappedDiff.x = diff.x - sign(diff.x) * numPoints;
+                if (abs(diff.x) > patternSize * 0.5f) {
+                    diff.x -= sign(diff.x) * patternSize;
                 }
-                if (abs(diff.y) > numPoints * 0.5) {
-                    wrappedDiff.y = diff.y - sign(diff.y) * numPoints;
+                if (abs(diff.y) > patternSize * 0.5f) {
+                    diff.y -= sign(diff.y) * patternSize;
                 }
 
             
-                float distToCell = length(wrappedDiff);
-                if (distToCell < minDistToCell)
+                float distToCell = length(diff);
+                if (distToCell < minDistUV)
                 {
-                    minDistToCell = distToCell;
-                    closestCell = wrappedCell;
+                    // Distance to the nearest cell in uv space
+                    minDistUV = distToCell;
+
+                    // Unwrapping the wrapped uv space position to world space
+                    closestCellPos = cellPosition - float2(abs(diff.x) > patternSize * .5f ? sign(diff.x) * patternSize : 0,
+                        abs(diff.y) > patternSize * .5f ? sign(diff.y) * patternSize : 0);
                 }
             }
         }
 
-        float2 voronoiCell = (closestCell * scale) / numPoints;
+        float2 voronoiCell = closestCellPos * scale;
 
 
         // PART 3:
@@ -122,7 +125,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         //float random6 = pcg_float(seed + 5u);
         
         float bladeHeight = random1 * (height.y - height.x) + height.x;
-        float2 facing2D = /*normalize(voronoiCell - offsetPos);*/ normalize(float2(random2, random3) * 2.0f - 1); // Between -1 and 1
+        float2 facing2D = normalize(voronoiCell - offsetPos); // normalize(float2(random2, random3) * 2.0f - 1); // Between -1 and 1
         float bladeTilt = random4 * (tilt.y - tilt.x) + tilt.x;
         float bladeBend = random5 * (bend.y - bend.x) + bend.x;
         float3 facing = float3(facing2D.x, 0, facing2D.y);
@@ -169,7 +172,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // Put together the struct for the blade, then add it to the buffer so that the game will render it.
         GrassBlade blade;
         blade.position = worldPos;
-        blade.nearestClumpPosition = float3(closestCell.x, 0, closestCell.y);
+        blade.nearestClumpPosition = float3(closestCellPos.x, 0, closestCellPos.y);
         blade.width = -.2f;
         blade.widthDir = widthDir;
         blade.coefficients = float4x3(c0, c1, c2, c3);

@@ -10,46 +10,44 @@ public class GrassChunkManager : MonoBehaviour
 {
     [Header("Terrain Setup")]
     [SerializeField] private Terrain terrain;
-    [Range(1, 128)] public int chunksPerSide;
-    [Range(0, 128)] public int numPoints;
-    
-    [Header("Grass Settings")]
-    public static Material grassMaterial;
-    public static Material grassLODMaterial;
-    [SerializeField] private Mesh grassMesh;
-    public ComputeShader grassComputeShader;
-    public static GraphicsBuffer highResIndexBuffer;
-    public static GraphicsBuffer lowResIndexBuffer;
-    private GraphicsBuffer grassDesc;
     [SerializeField] private Material grassMat;
     [SerializeField] private Material lodMat;
-    public float scale = 32;
-    private float grassDist;
-    public static float chunkSize;
+    public static Material grassMaterial;
+    public static Material grassLODMaterial;
+    public ComputeShader grassComputeShader;
+    
+    [Header("Grass Settings")]
+    [Range(1, 128)] public int chunksPerSide;
+    [SerializeField] private GrassShape grassShapeRange; 
+    private static GrassShape grassShape;
+    
+    [Header("Grass Clump Settings")]
+    [Range(1, 128)] public int patternSize;
+    [Range(0, 100)] public float scale = 32;
     
     // Chunk management
     //private Dictionary<Vector2Int, GrassChunk> activeChunks = new Dictionary<Vector2Int, GrassChunk>();
     private GrassChunk[] activeChunks;
-    
-    // Terrain properties
     private Vector2Int totalChunkCount;
     public static Vector3 terrainPosition;
     private Vector3 terrainSize;
-    [SerializeField] private GrassShape grassShapeRange; 
-    private static GrassShape grassShape;
-
     
-    // Camera reference
-    private Camera mainCamera;
+    // Buffers and Shareables
+    private GraphicsBuffer grassDesc;
+    public static GraphicsBuffer highResIndexBuffer;
+    public static GraphicsBuffer lowResIndexBuffer;
+    public static float chunkSize;
+    private static Camera mainCamera;
+    
+    // Shader Property Lookups
     private static readonly int Shape = Shader.PropertyToID("GrassShape");
     private static readonly int Scale = Shader.PropertyToID("scale");
     private static readonly int GrassDist = Shader.PropertyToID("grassDist");
     private static readonly int FrustumData = Shader.PropertyToID("frustumData");
-    private static readonly int NumPoints = Shader.PropertyToID("numPoints");
+    private static readonly int PatternSize = Shader.PropertyToID("patternSize");
 
     private void Awake()
     {
-
         grassMaterial = grassMat;
         grassLODMaterial = lodMat;
     }
@@ -120,12 +118,12 @@ public class GrassChunkManager : MonoBehaviour
         
         // Terrain may not be perfectly square. The chunks should be though
         chunkSize = terrainSize.x / chunksPerSide;
-        grassDist = chunkSize / 128.0f;
+        float grassDist = chunkSize / 128.0f;
         
         // At this point, some information based on chunk positioning for the compute shader will be set and stay unchanged
         grassComputeShader.SetFloat(Scale, scale);
         grassComputeShader.SetFloat(GrassDist, grassDist);
-        grassComputeShader.SetFloat(NumPoints, numPoints);
+        grassComputeShader.SetFloat(PatternSize, patternSize);
         
         // Set up chunk tracking 
         totalChunkCount = new Vector2Int(chunksPerSide, chunksPerSide);
@@ -175,7 +173,7 @@ public class GrassChunkManager : MonoBehaviour
         }
         grassComputeShader.SetFloats(FrustumData, frustumData);
         grassComputeShader.SetFloat(Scale, scale);
-        grassComputeShader.SetFloat(NumPoints, numPoints);
+        grassComputeShader.SetFloat(PatternSize, patternSize);
 
         Vector3 cameraPos = SceneView.lastActiveSceneView.camera.transform.position; //mainCamera.transform.position;
         

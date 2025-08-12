@@ -50,9 +50,11 @@ Shader "Custom/Voronoi"
             {
                 float2 uv = input.uv * _NumPoints;
                 float2 baseCell = floor(uv);
-                float minDistToCell = 10.0;
-                float2 closestCell;
-
+                float minDistToCell = 100.0;
+                //float2 closestCell;
+                //float2 closestCellPos;
+            
+                // Voronoi Noise Implementation
                 [unroll]
                 for (int x = -1; x <= 1; x++)
                 {
@@ -60,34 +62,34 @@ Shader "Custom/Voronoi"
                     for (int y = -1; y <= 1; y++)
                     {
                         float2 cell = baseCell + float2(x,y);
-
                         float2 wrappedCell = fmod(cell + _NumPoints, _NumPoints);
-                        
-                        float2 cellPosition = wrappedCell + rand2(wrappedCell);
+                                
+                        float2 cellPosition = cell + rand2(wrappedCell);
                         float2 diff = cellPosition - uv;
 
 
-                        float2 wrappedDiff = diff;
                         if (abs(diff.x) > _NumPoints * 0.5) {
-                            wrappedDiff.x = diff.x - sign(diff.x) * _NumPoints;
+                            diff.x -= sign(diff.x) * _NumPoints;
                         }
                         if (abs(diff.y) > _NumPoints * 0.5) {
-                            wrappedDiff.y = diff.y - sign(diff.y) * _NumPoints;
+                            diff.y -= sign(diff.y) * _NumPoints;
                         }
 
-                        
-                        float distToCell = length(wrappedDiff);
-
+                    
+                        float distToCell = length(diff);
                         if (distToCell < minDistToCell)
                         {
                             minDistToCell = distToCell;
-                            closestCell = wrappedCell;
+                            //closestCell = wrappedCell;
+                            /*closestCellPos = cellPosition- float2(abs(diff.x) > _NumPoints * .5 ? sign(diff.x) * _NumPoints : 0,
+                                abs(diff.y) > _NumPoints * .5 ? sign(diff.y) * _NumPoints : 0);*/
                         }
                     }
                 }
-
+                
                 // for color
-                float random = rand2(closestCell);
+                //float random = rand2(closestCell);
+                //return random;
                 //return random;
                 return minDistToCell;
             }
