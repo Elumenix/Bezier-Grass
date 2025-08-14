@@ -26,6 +26,7 @@ public class GrassChunk
     // Saved shader property to prevent string lookup
     private static readonly int StartPosition = Shader.PropertyToID("startPosition");
     private static readonly int GrassBlades = Shader.PropertyToID("grassBlades");
+    private static readonly int GrassLodMode = Shader.PropertyToID("_GrassLodMode");
 
 
     public GrassChunk(Vector2Int chunkCoord, ref Vector3 chunkPadding)
@@ -109,7 +110,7 @@ public class GrassChunk
         float distanceFromChunk = Vector3.Distance(nearestPoint, cameraPos);
 
         // This is set up in the GrassMaterial
-        if (distanceFromChunk >= 25.0f) // low LOD
+        if (distanceFromChunk > 50.0f) // low LOD
         {
             isHighLOD = false;
             GraphicsBuffer.CopyCount(
@@ -117,8 +118,8 @@ public class GrassChunk
                 lowLodCommandBuffer,
                 4
             );
-
-            rp.material = GrassChunkManager.grassLODMaterial;
+            
+            rp.matProps.SetFloat(GrassLodMode, 0.0f);
             Graphics.RenderPrimitivesIndexedIndirect(rp, MeshTopology.Triangles, GrassChunkManager.lowResIndexBuffer, lowLodCommandBuffer);
         }
         else // high LOD
@@ -130,7 +131,7 @@ public class GrassChunk
                 4
             );
 
-            rp.material = GrassChunkManager.grassMaterial;
+            rp.matProps.SetFloat(GrassLodMode, 1.0f);
             Graphics.RenderPrimitivesIndexedIndirect(rp, MeshTopology.Triangles, GrassChunkManager.highResIndexBuffer, commandBuffer);
         }
     }

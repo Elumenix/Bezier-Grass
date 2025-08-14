@@ -11,9 +11,7 @@ public class GrassChunkManager : MonoBehaviour
     [Header("Terrain Setup")]
     [SerializeField] private Terrain terrain;
     [SerializeField] private Material grassMat;
-    [SerializeField] private Material lodMat;
     public static Material grassMaterial;
-    public static Material grassLODMaterial;
     public ComputeShader grassComputeShader;
     
     [Header("Grass Settings")]
@@ -49,7 +47,6 @@ public class GrassChunkManager : MonoBehaviour
     private void Awake()
     {
         grassMaterial = grassMat;
-        grassLODMaterial = lodMat;
     }
 
     private void Start()

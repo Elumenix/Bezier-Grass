@@ -5,7 +5,6 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-
 struct GrassBlade
 {
     float3 position;
@@ -40,6 +39,7 @@ float2 _LodRange;
 float _AdjustmentThreshold;
 float _AdjustmentStrength;
 float _NormalCurvature;
+float _Translucency;
 
 
 void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 tangentVec)
@@ -114,21 +114,14 @@ float3 viewSpaceAdjustment(GrassBlade blade, float3 pos, float3 tangentVec)
     return lerp(blade.widthDir, cameraFacingWidthDir, adjustAmount);
 }
 
-half4 CalculateGrassLighting(Varyings input)
+half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT_FACE_SEMANTIC)
 {
     // Setting up some data ahead of time
+    float facing = IS_FRONT_VFACE(isFrontFace, 1.0, -1.0);
     half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
-    float3 normalDirWS = normalize(input.normalWS);
-
-    // This code may be causing problems, temporarily disabling it.
-    // Because we're doing cull off and making the mesh double-sided that way, we need to actually know whether
-    // we're looking at the front or back of the mesh currently so that the same lighting isn't used for both sides
-    float facing = dot(input.normalWS, viewDirWS);
-    if (facing < 0)
-    {
-        normalDirWS = -normalDirWS;
-    }
-                
+    float3 normalDirWS = normalize(input.normalWS) * facing;
+    Light light = GetMainLight();
+    
     // Set data needed to calculate lighting
     InputData lightData = (InputData)0;
     lightData.positionWS = input.positionWS;
@@ -149,7 +142,13 @@ half4 CalculateGrassLighting(Varyings input)
     surfaceData.occlusion = _Occlusion;
                 
     // Apply PBR Lighting
-    return UniversalFragmentPBR(lightData, surfaceData);
+    half4 pbr = UniversalFragmentPBR(lightData, surfaceData);
+    
+    // Subsurface scattering on back faces, so that the back of grass doesn't look as abnormally dark
+    half backLight = saturate(dot(-normalDirWS, light.direction));
+    half3 translucentLight = backLight * _Translucency * _Color.rgb;
+    half3 subSurfaceLight = translucentLight * light.shadowAttenuation * light.distanceAttenuation * light.color;
+    return pbr + half4(subSurfaceLight, 1);
 }
 
 #endif

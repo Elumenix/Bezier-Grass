@@ -7,6 +7,7 @@ Shader "Custom/Grass"
         _Glossiness ("Smoothness", Range(0,1.0)) = 0.5
         _Metallic ("Metallic", Range(0,1.0)) = 0.0
         _Occlusion ("Occlusion", Range(0,1.0)) = 1.0
+        _Translucency ("Translucency", Range(0.0, 1.0)) = 0.3
         _NormalCurvature ("Normal Curve", Range(0.0, 1.0)) = 0.5
         
         [Header(Camera View Space Projection Settings)]
@@ -14,8 +15,6 @@ Shader "Custom/Grass"
         _AdjustmentStrength ("Adjustment Strength", Range(0.0,1.0)) = 0.75
         
         [Header(Blade Behavior)]
-        [Toggle] swaying ("Sway Blade", Float) = 0
-        windStrength ("Wind Strength", Range(0.0, 5.0)) = 0.5
         _LodRange ("LOD Range", Vector) = (200, 500, 0, 0)
     }
     SubShader
@@ -32,8 +31,9 @@ Shader "Custom/Grass"
 
         // All data for grass shape is stored on the cpu for efficiency rather than needing to be passed every frame
         // This also means that all instances of this shader share this data rather than every chunk/instance needing it's own version
-        static const half arcTBuffer[8] = { 0.001f, 0.33f, 0.49f, 0.62f, 0.73f, 0.83f, 0.92f, 1.0f };
+        static const half arcTBuffer[8] = { 0.001f, 0.2f, 0.3f, 0.48f, 0.69f, 0.81f, 0.91f, 1.0f };
         static const half lodTBuffer[8] = { 0.001f, 0.001f, 0.001f, 0.5f, 0.8f, 1.0f, 1.0f, 1.0f };
+        static const half arcLODBuffer[4] = { 0.001f, 0.5f, 0.8f, 1.0f };
         StructuredBuffer<GrassBlade> grassBlades; // From the compute shader
         ENDHLSL
         
@@ -56,33 +56,53 @@ Shader "Custom/Grass"
             #pragma shader_feature_fragment _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma shader_feature_fragment _ADDITIONAL_LIGHT_SHADOWS
 
+            CBUFFER_START(UnityPerMaterial)
+                float _GrassLodMode;
+            CBUFFER_END
+
+
+
             void Vertex(Attributes input, uint instanceID : SV_InstanceID, out Varyings o)
             {
                 GrassBlade blade = grassBlades[instanceID];
-
-                // We want to switch to a low detail grass blade if far away from the mesh. To make this seamless, we're
-                // stretching vertices towards the end of the grass blade so that it fades to a low detail mesh instead of instantly changing
-                float distanceToCamera = distance(blade.position, _WorldSpaceCameraPos);
-                float lodValue = saturate((distanceToCamera - _LodRange.x) / (_LodRange.y - _LodRange.x));
-
-                // We're precomputing ArcT instead of doing an expensive arc length parameterization calculation in the vertex shader
-                // There's no closed form solution for arc length parameterization for cubic bezier curves, so this is much easier
+                
                 uint vertex = input.vertexID;
                 uint pair = vertex / 2;
-                half t = lerp(arcTBuffer[pair], lodTBuffer[pair], lodValue);
+                half t = 0;
+
+                // This "Branch" uses a CBuffer that will be constant for every instance this draw call
+                // As all blades will follow the same branch, there is expected to be near 0 performance impact from this "Branch"
+                if (_GrassLodMode > 0.5) // Should be 1 if true, 0 if false
+                {
+                    // We want to switch to a low detail grass blade if far away from the mesh. To make this seamless, we're
+                    // stretching vertices towards the end of the grass blade so that it fades to a low detail mesh instead of instantly changing
+                    float distanceToCamera = distance(blade.position, _WorldSpaceCameraPos);
+                    float lodValue = saturate((distanceToCamera - _LodRange.x) / (_LodRange.y - _LodRange.x));
+
+                    // We're precomputing ArcT instead of doing an expensive arc length parameterization calculation in the vertex shader
+                    // There's no closed form solution for arc length parameterization for cubic bezier curves, so this is much easier
+                    t = lerp(arcTBuffer[pair], lodTBuffer[pair], lodValue);
+                    o.uv = float2(vertex == 14 ? .5 : vertex % 2, pair / 7.0f);
+                }
+                else
+                {
+                    // If low lod, we don't need to worry about transitioning lods at all.
+                    t = arcLODBuffer[pair];
+                    o.uv = float2(vertex == 6 ? .5 : vertex % 2, t);
+                }
 
                 float3 pos;
                 float3 tangentVec;
                 CalculateBezierCurve(blade, t, pos, tangentVec);
             
-                // Blade will get skinnier the further up it goes, with point 14 (the last one) being along the center
+                // Blade will get skinnier the further up it goes, with the last one being along the center
                 float sideOffset = blade.width - (blade.width * t * t);
                 int odd = (vertex % 2) * 2 - 1; // -1 or 1
             
                 float3 widthDir = viewSpaceAdjustment(blade, pos, tangentVec);
                 pos += widthDir * sideOffset * odd;
 
-                // Normals are rounded so that the blades don't look as flat and reflet light better
+                // Normals are rounded so that the blades don't look as flat and reflect light better
                 float3 GeometricNormalOS = cross(tangentVec, widthDir);
                 float normalizedWidth = sideOffset / blade.width;
                 float3 roundingOffset = widthDir * odd * normalizedWidth * _NormalCurvature;
@@ -95,13 +115,14 @@ Shader "Custom/Grass"
                 o.positionWS = positionWS;
                 o.normalWS = normalize(TransformObjectToWorldNormal(roundedNormal));
                 o.vertexID = vertex;
-                o.uv = float2(vertex == 14 ? .5 : vertex % 2, t);
             }
 
-            half4 Fragment(Varyings input) : SV_Target 
+            half4 Fragment(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT_FACE_SEMANTIC) : SV_Target 
             {
+                //return half4(lerp(0, 1, abs(input.uv.x * 2 - 1)), 0, 0, 1);
+                //return half4(input.uv.xy,0,1);
                 //return float4(input.normalWS.xyz, 1);
-                half4 pbr = CalculateGrassLighting(input);
+                half4 pbr = CalculateGrassLighting(input, isFrontFace);
                 return pbr;
             }
             ENDHLSL
