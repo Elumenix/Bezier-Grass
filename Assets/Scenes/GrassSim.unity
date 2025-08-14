@@ -243,7 +243,7 @@ Transform:
   m_GameObject: {fileID: 1165485588}
   serializedVersion: 2
   m_LocalRotation: {x: 0.2905262, y: -0.007515111, z: 0.0022818323, w: 0.95683485}
-  m_LocalPosition: {x: 147.72, y: 157.3, z: -85.1}
+  m_LocalPosition: {x: 156.2, y: 153.2, z: -80.2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -377,7 +377,7 @@ MonoBehaviour:
   terrain: {fileID: 2088398974}
   grassMat: {fileID: 2100000, guid: 348f0ac48fa547443bc63b5d7550a3cd, type: 2}
   grassComputeShader: {fileID: 7200000, guid: 41794ce6da9a3544d9b3e27fa2250cd1, type: 3}
-  chunksPerSide: 16
+  chunksPerSide: 6
   grassShapeRange:
     height: {x: 0.5, y: 2}
     tilt: {x: 0.5, y: 2}
@@ -393,7 +393,7 @@ Transform:
   m_GameObject: {fileID: 1585979606}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 316.30325, y: 458.0916, z: -274.7199}
+  m_LocalPosition: {x: 316.30325, y: 459.74, z: 986.9}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children: []

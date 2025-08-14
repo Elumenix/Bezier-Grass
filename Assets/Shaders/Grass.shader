@@ -68,7 +68,7 @@ Shader "Custom/Grass"
                 
                 uint vertex = input.vertexID;
                 uint pair = vertex / 2;
-                half t = 0;
+                half t;
 
                 // This "Branch" uses a CBuffer that will be constant for every instance this draw call
                 // As all blades will follow the same branch, there is expected to be near 0 performance impact from this "Branch"
@@ -99,7 +99,7 @@ Shader "Custom/Grass"
                 float sideOffset = blade.width - (blade.width * t * t);
                 int odd = (vertex % 2) * 2 - 1; // -1 or 1
             
-                float3 widthDir = viewSpaceAdjustment(blade, pos, tangentVec);
+                float3 widthDir = ViewSpaceAdjustment(blade, pos, tangentVec);
                 pos += widthDir * sideOffset * odd;
 
                 // Normals are rounded so that the blades don't look as flat and reflect light better
@@ -119,7 +119,7 @@ Shader "Custom/Grass"
 
             half4 Fragment(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT_FACE_SEMANTIC) : SV_Target 
             {
-                //return half4(lerp(0, 1, abs(input.uv.x * 2 - 1)), 0, 0, 1);
+                //return half4(lerp(0, 1, pow(abs(input.uv.x * 2 - 1),.5)), 0, 0, 1);
                 //return half4(input.uv.xy,0,1);
                 //return float4(input.normalWS.xyz, 1);
                 half4 pbr = CalculateGrassLighting(input, isFrontFace);

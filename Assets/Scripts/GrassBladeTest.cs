@@ -6,8 +6,9 @@ using UnityEngine.Rendering;
 using UnityEngine.UIElements;
 using static Unity.Mathematics.math;
 using float2 = Unity.Mathematics.float2;
+using float3 = Unity.Mathematics.float3;
 
-struct GrassBlade
+struct TestGrassBlade
 {
     public float3 position;
     public float width;
@@ -15,7 +16,6 @@ struct GrassBlade
     public float2 facing;
     public float tilt;
     public float bend;
-    public float3 nearestClumpPosition;
 };
 
 [ExecuteInEditMode]
@@ -26,6 +26,7 @@ public class GrassBladeTest : MonoBehaviour
     public float height = 3;
     public float tilt = 3;
     public float bend = 1;
+    public float2 facing;
     [Range(0, 1)] public float LODValue = 0;
 
     [Header("ArcLengthParameterization")] 
@@ -68,7 +69,7 @@ public class GrassBladeTest : MonoBehaviour
         t = Matrix4x4.identity;
         instanceData = new[] {t};
         bladeBuffer?.Release();
-        bladeBuffer = new ComputeBuffer(1, sizeof(float) * 12);
+        bladeBuffer = new ComputeBuffer(1, sizeof(float) * 9);
         arcLengthTBuffer?.Release();
         arcLengthTBuffer = new ComputeBuffer(8, sizeof(float));
         lodTBuffer?.Release();
@@ -134,24 +135,20 @@ public class GrassBladeTest : MonoBehaviour
     {
         if (bladeBuffer == null) InitializeData();
         
-        Vector2 hash = rand2(new Vector2(transform.position.x, transform.position.z));
-        
         // This classes object is being used as position, as if it were a seed. We want the grass centered in the scene for testing
-        GrassBlade blade = new GrassBlade()
+        TestGrassBlade blade = new TestGrassBlade()
         {
-            position = this.transform.position,
+            position = float3.zero,
             width = this.width,
             height = this.height,
-            facing = float2.zero,
+            facing = this.facing,
             tilt = this.tilt,
             bend = this.bend,
-            nearestClumpPosition = Vector3.zero
         };
         
         bladeBuffer!.SetData(new [] {blade});
         arcLengthTBuffer.SetData(distribution);
         lodTBuffer.SetData(lodDistribution);
-        mpb.SetVector(Hash, hash);
         mpb.SetBuffer(BladeBuffer, bladeBuffer);
         mpb.SetBuffer(ArcLengthTBuffer, arcLengthTBuffer);
         mpb.SetBuffer(LodTBuffer, lodTBuffer);
@@ -175,7 +172,7 @@ public class GrassBladeTest : MonoBehaviour
         Vector2 bladeHash2D = rand2(new Vector2(transform.position.x, transform.position.z));
         bend = bladeHash2D.x < 0.05f ? 0.0f : .1f;
         tilt = bladeHash2D.y;
-        Vector2 facing = normalize(bladeHash2D * 2.0f - Vector2.one); // Random values between 0 and 1
+        facing = normalize(bladeHash2D * 2.0f - Vector2.one); // Random values between 0 and 1
 
         // Endpoint is based on height and tilt
         p3.transform.position = p0.transform.position + new Vector3(facing.x, 0, facing.y) * tilt + Vector3.up * height;
@@ -191,14 +188,11 @@ public class GrassBladeTest : MonoBehaviour
         p2.transform.position = (p0.transform.position + midPoint) + awayDir * bend;
     }
 
-    // Doesn't move bend, tilt, height
+    // Doesn't move bend, tilt, height, facing
     private void UpdatePoints()
     {
+        facing = normalize(facing);
         p0.transform.position = Vector2.zero;
-        
-        // randomness based off position of this classes object so that I can randomize while still centering the blade
-        Vector2 bladeHash2D = rand2(new Vector2(transform.position.x, transform.position.z));
-        Vector2 facing = normalize(bladeHash2D * 2.0f - Vector2.one); // Random values between 0 and 1
 
         // Endpoint is based on height and tilt
         p3.transform.position = p0.transform.position + new Vector3(facing.x, 0, facing.y) * tilt + Vector3.up * height;

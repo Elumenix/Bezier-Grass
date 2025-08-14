@@ -14,6 +14,16 @@ struct GrassBlade
     float4x3 coefficients;
 };
 
+struct TestGrassBlade
+{
+    float3 position;
+    float width;
+    float height;
+    float2 facing;
+    float tilt;
+    float bend;
+};
+
 struct Attributes
 {
     uint vertexID : SV_VertexID;
@@ -41,6 +51,40 @@ float _AdjustmentStrength;
 float _NormalCurvature;
 float _Translucency;
 
+/// Essentially copying part of the compute shader code to make a grassblade. This should only be used for testing
+GrassBlade CreateGrassBlade(TestGrassBlade blade)
+{
+    GrassBlade newBlade;
+
+    newBlade.nearestClumpPosition = float3(0,0,0);
+    newBlade.position = blade.position;
+    newBlade.width = blade.width;
+
+    
+    float3 up = float3(0,1,0);
+    float3 widthDir = float3(blade.facing.y, 0, -blade.facing.x); // Orthogonal normal to facing
+    
+    float3 p0 = float3(0,0,0); // Root of the grass blade in object space.
+    float3 p1 = p0 + up * (blade.height * blade.bend); // Above the starting point. Controls how rigid the base is.
+    float3 p3 = p0 + float3(blade.facing.x, 0, blade.facing.y) * blade.tilt + up * blade.height; // Endpoint is based on height and tilt.
+
+    float3 diff = p3 - p0;
+    float3 midPoint = 0.5f * diff;
+    float3 bladeDir = normalize(diff);
+    float3 awayDir = normalize(cross(-widthDir, bladeDir));
+
+    // Towards the middle and away from the blade. Predominantly controls how bent the blade is
+    float3 p2 = p0 + midPoint + awayDir * blade.bend;
+    
+    float3 c0 = p0;                        // Offset
+    float3 c1 = 3 * (p1 - p0);             // t
+    float3 c2 = 3 * (p0 - 2 * p1 + p2);    // t^2
+    float3 c3 = p3 - 3 * p2 + 3 * p1 - p0; // t^3
+
+    newBlade.coefficients = float4x3(c0, c1, c2, c3);
+    newBlade.widthDir = widthDir;
+    return newBlade;
+}
 
 void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 tangentVec)
 {
@@ -93,7 +137,7 @@ void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 
     tangentVec = normalize(derivative);
 }
 
-float3 viewSpaceAdjustment(GrassBlade blade, float3 pos, float3 tangentVec)
+float3 ViewSpaceAdjustment(GrassBlade blade, float3 pos, float3 tangentVec)
 {
     // Direction the camera is pointing
     float3 cameraDir = normalize(_WorldSpaceCameraPos - (pos + blade.position));

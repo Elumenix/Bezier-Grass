@@ -2,8 +2,17 @@ Shader "Custom/GrassBladeTest"
 {
     Properties
     {
-        [Toggle] swaying ("Sway Blade", Float) = 0
-        windStrength ("Wind Strength", Range(0.0, 5.0)) = 0.5
+        [Header(Property Settings)]
+        _Color ("Color", Color) = (1,1,1,1)
+        _Glossiness ("Smoothness", Range(0,1.0)) = 0.5
+        _Metallic ("Metallic", Range(0,1.0)) = 0.0
+        _Occlusion ("Occlusion", Range(0,1.0)) = 1.0
+        _Translucency ("Translucency", Range(0.0, 1.0)) = 0.3
+        _NormalCurvature ("Normal Curve", Range(0.0, 1.0)) = 0.5
+        
+        [Header(Camera View Space Projection Settings)]
+        _AdjustmentThreshold ("Adjustment Threshold", Range(0.0,1.0)) = 0.25
+        _AdjustmentStrength ("Adjustment Strength", Range(0.0,1.0)) = 0.75
     }
     SubShader
     {
@@ -17,13 +26,12 @@ Shader "Custom/GrassBladeTest"
         HLSLINCLUDE
         
         #include "Includes/GrassBlade.cginc"
-        StructuredBuffer<GrassBlade> _BladeBuffer;
+        StructuredBuffer<TestGrassBlade> _BladeBuffer;
         StructuredBuffer<float> _ArcLengthTBuffer;
         StructuredBuffer<float> _LodTBuffer;
 
         // Hash will not be a part of the final implementation. Because we're testing control points on the cpu here,
         // We need something that will maintain precision between C# and HLSL, so we need to do this specifically here
-        float2 hash;
         float LoDValue;
         
         ENDHLSL
@@ -40,61 +48,68 @@ Shader "Custom/GrassBladeTest"
             Cull Off // disable back-face culling
             HLSLPROGRAM
             #define _SPECULAR_COLOR
+            #pragma target 5.0;
             #pragma vertex Vertex
             #pragma fragment Fragment
-            
             #pragma multi_compile_instancing
             #pragma shader_feature _FORWARD_PLUS
             #pragma shader_feature_fragment _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma shader_feature_fragment _ADDITIONAL_LIGHT_SHADOWS
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             
-
-            // Add instancing support for this shader. You need to check 'Enable Instancing' on materials that use the shader.
-            // See https://docs.unity3d.com/Manual/GPUInstancing.html for more information about instancing.
-            // #pragma instancing_options assumeuniformscaling
-            UNITY_INSTANCING_BUFFER_START(Props)
-                
-            UNITY_INSTANCING_BUFFER_END(Props)
 
             float2 rand2(float2 p) {
                 return frac(sin(float2(dot(p, float2(127.1f, 311.7f)), dot(p, float2(269.5f, 183.3f)))) * 43758.5453f);
             }
-            
+
+            /// NOTE: THIS IS NOT AN EFFICIENT SHADER, IT'S MEANT TO RENDER A SINGLE GRASS BLADE WITHOUT THE SUPPORT
+            /// OFF THE COMPUTE SHADER THAT MAKES ALL OF THIS MUCH MORE EFFICIENT. THIS IS MAINLY COPYING THE PIPELINE
+            /// FROM THERE SO THAT I CAN DIRECTLY TEST OUT SHAPE CHANGES HERE. DO NOT COPY THIS CODE FOR ELSEWHERE.
             void Vertex(Attributes input, out Varyings o)
             {
-                GrassBlade blade = _BladeBuffer[0];
-                //blade.facing = normalize(hash * 2 - float2(1,1));
-
+                TestGrassBlade testBlade = _BladeBuffer[0];
+                GrassBlade blade = CreateGrassBlade(testBlade);
+                
                 // We're precomputing ArcT instead of doing an expensive arc length perameterization calculation in the vertex shader
                 // There's no closed form solution for arc length parameterization for cubic beziers, so this is much easier
                 uint vertex = input.vertexID;
                 float t = _ArcLengthTBuffer[vertex / 2];
                 t = lerp(t, _LodTBuffer[vertex / 2], LoDValue);
             
-                float3 pos;
-                float3 normalOS;
-                CalculateBezierCurve(blade, t, pos, normalOS);
                 
-                // Blade will get skinnier the further up it goes, with point 14 (the last one) being along the center
-                //float sideOffset = blade.width - ((blade.width / 7.0) * (vertex / 2));
-                float sideOffset = blade.width - (blade.width * t*t);
+                float3 pos;
+                float3 tangentVec;
+                CalculateBezierCurve(blade, t, pos, tangentVec);
+            
+                // Blade will get skinnier the further up it goes, with the last one being along the center
+                float sideOffset = blade.width - (blade.width * t * t);
                 int odd = (vertex % 2) * 2 - 1; // -1 or 1
-                pos += blade.widthDir * sideOffset * odd;
+            
+                float3 widthDir = ViewSpaceAdjustment(blade, pos, tangentVec);
+                pos += widthDir * sideOffset * odd;
 
-                VertexPositionInputs positionInputs = GetVertexPositionInputs(pos);
-                o.positionCS = positionInputs.positionCS;
-                o.positionWS = positionInputs.positionWS;
-                o.normalWS = TransformObjectToWorld(normalOS);
+                // Normals are rounded so that the blades don't look as flat and reflect light better
+                float3 GeometricNormalOS = cross(tangentVec, widthDir);
+                float normalizedWidth = sideOffset / blade.width;
+                float3 roundingOffset = widthDir * odd * normalizedWidth * _NormalCurvature;
+                float3 roundedNormal = normalize(GeometricNormalOS + roundingOffset);
+
+
+                // Passing data to the fragment shader
+                float3 positionWS = TransformObjectToWorld(pos) + blade.position;
+                o.positionCS = TransformWorldToHClip(positionWS);
+                o.positionWS = positionWS;
+                o.normalWS = normalize(TransformObjectToWorldNormal(roundedNormal));
                 o.vertexID = vertex;
                 o.uv = float2(vertex == 14 ? .5 : vertex % 2, t);
             }
 
-            float4 Fragment(Varyings input) : SV_Target 
+            half4 Fragment(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT_FACE_SEMANTIC) : SV_Target 
             {
+
+                half4 pbr = CalculateGrassLighting(input, isFrontFace);
+                return pbr;
                 // Set data needed to calculate lighting
-                InputData lightData = (InputData)0;
+                /*InputData lightData = (InputData)0;
                 lightData.positionWS = input.positionWS;
                 lightData.normalWS = normalize(input.normalWS);
                 lightData.viewDirectionWS = GetWorldSpaceViewDir(input.positionWS);
@@ -110,7 +125,7 @@ Shader "Custom/GrassBladeTest"
                 surfaceData.specular = 0;
                 
                 float3 color = UniversalFragmentBlinnPhong(lightData, surfaceData); //+ unity_AmbientSky;
-                return float4(color, 1.0);
+                return float4(color, 1.0);*/
             }
             ENDHLSL
         }
