@@ -9,7 +9,7 @@ struct GrassBlade
 {
     float3 position;
     float3 nearestClumpPosition;
-    float width;
+    float2 dimensions;
     float3 widthDir;
     float4x3 coefficients;
 };
@@ -58,7 +58,7 @@ GrassBlade CreateGrassBlade(TestGrassBlade blade)
 
     newBlade.nearestClumpPosition = float3(0,0,0);
     newBlade.position = blade.position;
-    newBlade.width = blade.width;
+    newBlade.dimensions = float2(blade.width, blade.tilt);
 
     
     float3 up = float3(0,1,0);
@@ -179,11 +179,11 @@ half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT
     // Surface data is for additional data from textures. 
     SurfaceData surfaceData;
     ZERO_INITIALIZE(SurfaceData, surfaceData);
-    surfaceData.albedo = _Color.rgb;
+    surfaceData.albedo = _Color.rgb * lerp(.7f, 1.0f, input.uv.y); // Top is lighter than the bottom
     surfaceData.alpha = 1.0;
-    surfaceData.smoothness = _Glossiness;
+    surfaceData.smoothness = _Glossiness * lerp(.55f, 1.0f, input.uv.y);
     surfaceData.metallic = _Metallic;
-    surfaceData.occlusion = _Occlusion;
+    surfaceData.occlusion = _Occlusion * lerp(.3f, 1.0f, input.uv.y);
                 
     // Apply PBR Lighting
     half4 pbr = UniversalFragmentPBR(lightData, surfaceData);

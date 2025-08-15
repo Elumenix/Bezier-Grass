@@ -68,7 +68,7 @@ Shader "Custom/Grass"
                 
                 uint vertex = input.vertexID;
                 uint pair = vertex / 2;
-                half t;
+                half t = 0;
 
                 // This "Branch" uses a CBuffer that will be constant for every instance this draw call
                 // As all blades will follow the same branch, there is expected to be near 0 performance impact from this "Branch"
@@ -96,7 +96,7 @@ Shader "Custom/Grass"
                 CalculateBezierCurve(blade, t, pos, tangentVec);
             
                 // Blade will get skinnier the further up it goes, with the last one being along the center
-                float sideOffset = blade.width - (blade.width * t * t);
+                float sideOffset = blade.dimensions.x - (blade.dimensions.x * t * t);
                 int odd = (vertex % 2) * 2 - 1; // -1 or 1
             
                 float3 widthDir = ViewSpaceAdjustment(blade, pos, tangentVec);
@@ -104,13 +104,21 @@ Shader "Custom/Grass"
 
                 // Normals are rounded so that the blades don't look as flat and reflect light better
                 float3 GeometricNormalOS = cross(tangentVec, widthDir);
-                float normalizedWidth = sideOffset / blade.width;
+                float normalizedWidth = sideOffset / blade.dimensions.x;
                 float3 roundingOffset = widthDir * odd * normalizedWidth * _NormalCurvature;
                 float3 roundedNormal = normalize(GeometricNormalOS + roundingOffset);
 
 
-                // Passing data to the fragment shader
                 float3 positionWS = TransformObjectToWorld(pos) + blade.position;
+                float3 bladeDir = float3(-widthDir.z, 0, widthDir.x);
+
+                // Uv's need to be normalized by blade parameters instead of world space because the arcScaling
+                // between triangles throughs the accuracy of true uv's off, causing zig-zags
+                o.uv = float2(dot(positionWS - blade.position, normalize(widthDir)) / (blade.dimensions.x * 0.5),
+                    dot(positionWS - blade.position, normalize(bladeDir)) / blade.dimensions.y);
+                
+
+                // Passing data to the fragment shader
                 o.positionCS = TransformWorldToHClip(positionWS);
                 o.positionWS = positionWS;
                 o.normalWS = normalize(TransformObjectToWorldNormal(roundedNormal));
@@ -119,9 +127,6 @@ Shader "Custom/Grass"
 
             half4 Fragment(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT_FACE_SEMANTIC) : SV_Target 
             {
-                //return half4(lerp(0, 1, pow(abs(input.uv.x * 2 - 1),.5)), 0, 0, 1);
-                //return half4(input.uv.xy,0,1);
-                //return float4(input.normalWS.xyz, 1);
                 half4 pbr = CalculateGrassLighting(input, isFrontFace);
                 return pbr;
             }

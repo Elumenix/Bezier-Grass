@@ -57,7 +57,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // This doesn't quite line up, If I move to the middle, there's no guarantee of the same starting height
         // I'll need to find a solution to this later on so that it lines up with the terrain
         float2 gridPos = startPosition.xz + float2(id.x * 4 + i, id.z * 4 + i) * grassDist; 
-        float2 offsetPos = gridPos + rand2(gridPos) * grassDist; // Jitter point to prevent visible grid
+        float2 offsetPos = gridPos + rand2(gridPos * float2(3.25f, 9.91563f)) * grassDist; // Jitter point to prevent visible grid
         float3 worldPos = float3(offsetPos.x, startPosition.y, offsetPos.y);
 
         // Early out if the blade wouldn't be visible. Don't add it to the appendBuffer because it shouldn't be rendered
@@ -172,8 +172,8 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // Put together the struct for the blade, then add it to the buffer so that the game will render it.
         GrassBlade blade;
         blade.position = worldPos;
-        blade.nearestClumpPosition = float3(closestCellPos.x, 0, closestCellPos.y);
-        blade.width = -.2f;
+        blade.nearestClumpPosition = float3(closestCellPos.x, bladeTilt, closestCellPos.y);
+        blade.dimensions = float2(-.2f, bladeTilt); // Tilt is the length (Which most closely follows arcLength)
         blade.widthDir = widthDir;
         blade.coefficients = float4x3(c0, c1, c2, c3);
         

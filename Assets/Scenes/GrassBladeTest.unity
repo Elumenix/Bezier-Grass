@@ -221,7 +221,7 @@ Transform:
   m_GameObject: {fileID: 41976702}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.008866638, y: 0.2808735, z: -0.007514097}
+  m_LocalPosition: {x: 0.00004406541, y: 0.2808735, z: 0.011622235}
   m_LocalScale: {x: 0.01, y: 0.01, z: 0.01}
   m_ConstrainProportionsScale: 1
   m_Children: []
@@ -365,14 +365,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   bladeMaterial: {fileID: 2100000, guid: ed4dadd5a5759594b8bd8fae0110c9bf, type: 2}
-  width: -0.05
+  width: -0.01
   height: 0.32
   tilt: 0.29
   bend: 0.18
   facing:
-    x: -0.76289564
-    y: -0.64652175
+    x: 0.003791445
+    y: 0.99999285
   LODValue: 0
+  freq: -50
+  decay: -0.98
   distribution:
   - 0.001
   - 0.33
@@ -1324,7 +1326,7 @@ Transform:
   m_GameObject: {fileID: 2112100598}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.22123973, y: 0.32, z: -0.1874913}
+  m_LocalPosition: {x: 0.001099519, y: 0.32, z: 0.2899979}
   m_LocalScale: {x: 0.01, y: 0.01, z: 0.01}
   m_ConstrainProportionsScale: 1
   m_Children: []

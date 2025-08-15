@@ -81,7 +81,7 @@ Shader "Custom/GrassBladeTest"
                 CalculateBezierCurve(blade, t, pos, tangentVec);
             
                 // Blade will get skinnier the further up it goes, with the last one being along the center
-                float sideOffset = blade.width - (blade.width * t * t);
+                float sideOffset = blade.dimensions.x - (blade.dimensions.x * t * t);
                 int odd = (vertex % 2) * 2 - 1; // -1 or 1
             
                 float3 widthDir = ViewSpaceAdjustment(blade, pos, tangentVec);
@@ -89,7 +89,7 @@ Shader "Custom/GrassBladeTest"
 
                 // Normals are rounded so that the blades don't look as flat and reflect light better
                 float3 GeometricNormalOS = cross(tangentVec, widthDir);
-                float normalizedWidth = sideOffset / blade.width;
+                float normalizedWidth = sideOffset / blade.dimensions.x;
                 float3 roundingOffset = widthDir * odd * normalizedWidth * _NormalCurvature;
                 float3 roundedNormal = normalize(GeometricNormalOS + roundingOffset);
 
