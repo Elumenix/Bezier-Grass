@@ -374,16 +374,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a2697953f4d8cd42b711d788c55b125, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  updateEveryFrame: 0
   terrain: {fileID: 2088398974}
   grassMat: {fileID: 2100000, guid: 348f0ac48fa547443bc63b5d7550a3cd, type: 2}
   grassComputeShader: {fileID: 7200000, guid: 41794ce6da9a3544d9b3e27fa2250cd1, type: 3}
-  chunksPerSide: 24
+  chunksPerSide: 16
   grassShapeRange:
     height: {x: 0.5, y: 2}
     tilt: {x: 0.5, y: 2}
     bend: {x: 0.1, y: 0.5}
   patternSize: 50
   scale: 5
+  clumpSeparation: 0.15
 --- !u!4 &1585979608
 Transform:
   m_ObjectHideFlags: 0

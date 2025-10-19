@@ -4,6 +4,7 @@
 #define GRASSBLADE
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+#include "PerlinNoise.hlsl"
 
 struct GrassBlade
 {
@@ -88,14 +89,16 @@ GrassBlade CreateGrassBlade(TestGrassBlade blade)
 
 void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 tangentVec)
 {
+    float perlinValue = perlin(blade.position.xz * .25f + float2(1.3, -.3) * _Time.y);
+    
     // PART 1:
     // Get the position of the point along the curve. The exact position of the control points for this blade of grass
     // have already been computed in the compute shader and converted to coefficients. This was done so that every grass
     // blade only needs to do this operation 1 time per chunk update, rather than for every vertex of the blade every frame.
     float3 c0 = blade.coefficients[0];
     float3 c1 = blade.coefficients[1];
-    float3 c2 = blade.coefficients[2];
-    float3 c3 = blade.coefficients[3];
+    float3 c2 = blade.coefficients[2] - float3(0, perlinValue * .5, 0);
+    float3 c3 = blade.coefficients[3] - float3(0, perlinValue, 0);
     
     // Get the correct point along the Bézier curve. Using mad operations as an optimization
     // float3 pos = c3t^3 + c2t^2 + c1t + c0

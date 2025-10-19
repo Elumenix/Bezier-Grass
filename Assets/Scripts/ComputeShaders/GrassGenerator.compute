@@ -8,8 +8,10 @@ AppendStructuredBuffer<GrassBlade> grassBlades;
 float4 frustumData[6];
 uint patternSize;
 float scale;
+float clumpSeparation;
 float grassDist;
 float3 startPosition;
+float mapSize; // Assumes perfectly square map
 static const float3 up = float3(0,1,0);
 
 cbuffer GrassShape 
@@ -20,7 +22,8 @@ cbuffer GrassShape
     float2 padding;
 };
 
-float2 rand2(float2 p)
+// Gpu math optimizations were causing flickering, so they've been disabled with the precise keyword
+precise float2 rand2(float2 p)
 {
     return frac(sin(float2(dot(p, float2(127.1, 311.7)), dot(p, float2(269.5, 183.3)))) * 43758.5453);
 }
@@ -33,6 +36,9 @@ float pcg_float(uint input) {
 
 bool isVisible(float3 bladePos)
 {
+    // If the blade is off the map, we can return and don't need to loop. This will only happen after clump logic plays out
+    if (bladePos.x < 0 || bladePos.z < 0 || bladePos.x > mapSize || bladePos.z > mapSize) return false;
+    
     // The way that frustum culling works is if the sphere is outside any plane, then it is not visible
     for (int i = 0; i < 6; i++)
     {
@@ -110,6 +116,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             }
         }
 
+        // puts cell position into worldSpace
         float2 voronoiCell = closestCellPos * scale;
 
 
@@ -158,7 +165,21 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             p2 = p2 + sin(timeMod*speedMult + 1.57 + phaseOffset) * maxAmplitude / 2.0 * awayDir;
         }*/
 
+        
         // PART 5:
+        // Put together the struct for the blade, then add it to the buffer so that the game will render it.
+        GrassBlade blade;
+        float2 clumpDistance = (voronoiCell - worldPos.xz) * clumpSeparation;
+        float3 newBladePosition = worldPos + float3(clumpDistance.x, 0, clumpDistance.y);
+        blade.position = newBladePosition;
+        blade.nearestClumpPosition = float3(closestCellPos.x, bladeTilt, closestCellPos.y);
+        blade.dimensions = float2(-.2f, bladeTilt); // Tilt is the length (Which most closely follows arcLength)
+        blade.widthDir = widthDir;
+
+        if (!isVisible(newBladePosition)) continue;
+
+        
+        // PART 6:
         // Compute the coefficients for a Bézier curve evaluation
         // Using the coefficients instead of the points will drastically cut down on the amount of math needed in the
         // vertex shader for each grass blade as much of the following math can be simplified to the coefficients.
@@ -166,15 +187,6 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float3 c1 = 3 * (p1 - p0);             // t
         float3 c2 = 3 * (p0 - 2 * p1 + p2);    // t^2
         float3 c3 = p3 - 3 * p2 + 3 * p1 - p0; // t^3
-
-
-        // PART 6:
-        // Put together the struct for the blade, then add it to the buffer so that the game will render it.
-        GrassBlade blade;
-        blade.position = worldPos;
-        blade.nearestClumpPosition = float3(closestCellPos.x, bladeTilt, closestCellPos.y);
-        blade.dimensions = float2(-.2f, bladeTilt); // Tilt is the length (Which most closely follows arcLength)
-        blade.widthDir = widthDir;
         blade.coefficients = float4x3(c0, c1, c2, c3);
         
         // Add this to the blades that will be rendered next frame
