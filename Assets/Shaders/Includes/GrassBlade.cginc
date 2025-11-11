@@ -44,7 +44,7 @@ half _Glossiness;
 half _Metallic;
 half _Occlusion;
 half _ViewAdj;
-half windStrength;
+half _WindScale; 
 half swaying;
 float2 _LodRange;
 float _AdjustmentThreshold;
@@ -89,7 +89,9 @@ GrassBlade CreateGrassBlade(TestGrassBlade blade)
 
 void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 tangentVec)
 {
-    float perlinValue = perlin(blade.position.xz * .25f + float2(1.3, -.3) * _Time.y);
+    float perlinValue = perlin(blade.position.xz * _WindScale + float2(1.3, -.3) * _Time.y);
+    float perlinValue2 = perlin((blade.position.xz + float2(134.26, -1035.98)) * _WindScale + float2(1.3, -.3) * _Time.y * 1.5);
+    float pValue = perlinValue * .75 + perlinValue2 * .25;
     
     // PART 1:
     // Get the position of the point along the curve. The exact position of the control points for this blade of grass
@@ -97,8 +99,8 @@ void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 
     // blade only needs to do this operation 1 time per chunk update, rather than for every vertex of the blade every frame.
     float3 c0 = blade.coefficients[0];
     float3 c1 = blade.coefficients[1];
-    float3 c2 = blade.coefficients[2] - float3(0, perlinValue * .5, 0);
-    float3 c3 = blade.coefficients[3] - float3(0, perlinValue, 0);
+    float3 c2 = blade.coefficients[2]; - float3(cos(pValue), sin(pValue), 0);
+    float3 c3 = blade.coefficients[3] - float3(cos(pValue), sin(pValue), 0);
     
     // Get the correct point along the Bézier curve. Using mad operations as an optimization
     // float3 pos = c3t^3 + c2t^2 + c1t + c0
@@ -163,6 +165,11 @@ float3 ViewSpaceAdjustment(GrassBlade blade, float3 pos, float3 tangentVec)
 
 half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT_FACE_SEMANTIC)
 {
+    /*float perlinValue = perlin(input.positionWS.xz * _WindScale + float2(1.3, -.3) * _Time.y);
+    float perlinValue2 = perlin((input.positionWS.xz + float2(134.26, -1035.98)) * _WindScale + float2(1.3, -.3) * _Time.y * 1.5);
+    
+    return half4(1-sin(perlinValue * perlinValue2),0,0,1);*/
+
     // Setting up some data ahead of time
     float facing = IS_FRONT_VFACE(isFrontFace, 1.0, -1.0);
     half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
