@@ -129,7 +129,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float random3 = pcg_float(seed + 2u);
         float random4 = pcg_float(seed + 3u);
         float random5 = pcg_float(seed + 4u);
-        //float random6 = pcg_float(seed + 5u);
+        float random6 = pcg_float(seed + 5u);
         
         float bladeHeight = random1 * (height.y - height.x) + height.x;
         float2 facing2D = /*normalize(voronoiCell - offsetPos);*/ normalize(float2(random2, random3) * 2.0f - 1); // Between -1 and 1
@@ -145,9 +145,9 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float3 p1 = p0 + up * (bladeHeight * bladeBend); // Above the starting point. Controls how rigid the base is.
         float3 p3 = p0 + facing * bladeTilt + up * bladeHeight; // Endpoint is based on height and tilt.
 
+        float3 bladeDir = normalize(p3);
         float3 diff = p3 - p0;
         float3 midPoint = 0.5f * diff;
-        float3 bladeDir = normalize(diff);
         float3 awayDir = normalize(cross(-widthDir, bladeDir));
 
         // Towards the middle and away from the blade. Predominantly controls how bent the blade is
@@ -172,6 +172,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float2 clumpDistance = (voronoiCell - worldPos.xz) * clumpSeparation;
         float3 newBladePosition = worldPos + float3(clumpDistance.x, 0, clumpDistance.y);
         blade.position = newBladePosition;
+        blade.hash = random6;
         blade.nearestClumpPosition = float3(closestCellPos.x, bladeTilt, closestCellPos.y);
         blade.dimensions = float2(-.2f, bladeTilt); // Tilt is the length (Which most closely follows arcLength)
         blade.widthDir = widthDir;

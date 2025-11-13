@@ -162,6 +162,12 @@ public class GrassChunkManager : MonoBehaviour
         // It isn't ideal to alter the compute buffers every frame, so this is set aside as a debug option 
         if (updateEveryFrame)
         {
+            // Update the grass shape
+            grassShape = grassShapeRange;
+            grassDesc.SetData(new [] { grassShape });
+            grassComputeShader.SetConstantBuffer(Shape, grassDesc, 0, 32);
+            
+            
             terrainPosition = terrain.transform.position;
             terrainSize = terrain.terrainData.size;
         

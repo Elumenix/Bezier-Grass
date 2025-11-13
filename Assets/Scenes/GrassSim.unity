@@ -381,7 +381,7 @@ MonoBehaviour:
   chunksPerSide: 16
   grassShapeRange:
     height: {x: 0.5, y: 2}
-    tilt: {x: 0.5, y: 2}
+    tilt: {x: 0.5, y: 1}
     bend: {x: 0.1, y: 0.5}
   patternSize: 50
   scale: 5

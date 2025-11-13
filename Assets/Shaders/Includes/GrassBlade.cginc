@@ -9,6 +9,7 @@
 struct GrassBlade
 {
     float3 position;
+    float hash;
     float3 nearestClumpPosition;
     float2 dimensions;
     float3 widthDir;
@@ -44,8 +45,10 @@ half _Glossiness;
 half _Metallic;
 half _Occlusion;
 half _ViewAdj;
-half _WindScale; 
-half swaying;
+half _WindScale;
+half _WindPower;
+half _WindAmplitude;
+half _WindSpeed;
 float2 _LodRange;
 float _AdjustmentThreshold;
 float _AdjustmentStrength;
@@ -60,6 +63,7 @@ GrassBlade CreateGrassBlade(TestGrassBlade blade)
     newBlade.nearestClumpPosition = float3(0,0,0);
     newBlade.position = blade.position;
     newBlade.dimensions = float2(blade.width, blade.tilt);
+    newBlade.hash = .34982983f; // Doesn't matter in testing really
 
     
     float3 up = float3(0,1,0);
@@ -89,9 +93,12 @@ GrassBlade CreateGrassBlade(TestGrassBlade blade)
 
 void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 tangentVec)
 {
-    float perlinValue = perlin(blade.position.xz * _WindScale + float2(1.3, -.3) * _Time.y);
-    float perlinValue2 = perlin((blade.position.xz + float2(134.26, -1035.98)) * _WindScale + float2(1.3, -.3) * _Time.y * 1.5);
-    float pValue = perlinValue * .75 + perlinValue2 * .25;
+    float perlinValue = perlin(blade.position.xz * _WindScale + _WindSpeed * _Time.y);
+    float perlinValue2 = perlin((blade.position.xz + float2(134.26, -1035.98)) * _WindScale + _WindSpeed * _Time.y * .5);
+    float pValue = (perlinValue * .75 + perlinValue2 * .25) * _WindPower; 
+
+    //float c2Offset = pow(.33, _WindPower) * (_WindAmplitude / 100) * sin(_Time * blade.hash * 6.283 * _WindSpeed) * perlinValue;
+    //float c3Offset = pow(.66, _WindPower) * (_WindAmplitude / 100) * sin(_Time * blade.hash * 6.283 * _WindSpeed) * perlinValue;     
     
     // PART 1:
     // Get the position of the point along the curve. The exact position of the control points for this blade of grass
@@ -99,8 +106,8 @@ void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 
     // blade only needs to do this operation 1 time per chunk update, rather than for every vertex of the blade every frame.
     float3 c0 = blade.coefficients[0];
     float3 c1 = blade.coefficients[1];
-    float3 c2 = blade.coefficients[2]; - float3(cos(pValue), sin(pValue), 0);
-    float3 c3 = blade.coefficients[3] - float3(cos(pValue), sin(pValue), 0);
+    float3 c2 = blade.coefficients[2] - float3(sin(pValue), sin(pValue), 0);
+    float3 c3 = blade.coefficients[3] - float3(sin(pValue), sin(pValue), 0);
     
     // Get the correct point along the Bézier curve. Using mad operations as an optimization
     // float3 pos = c3t^3 + c2t^2 + c1t + c0
