@@ -93,7 +93,7 @@ void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 
 {
     float perlinValue = perlin(blade.position.xz * _WindScale + _WindSpeed * _Time.y);
     float perlinValue2 = perlin((blade.position.xz + float2(134.26, -1035.98)) * _WindScale + _WindSpeed * _Time.y * .5);
-    float pValue = (perlinValue * .75 + perlinValue2 * .25) * _WindPower; 
+    float pValue = (perlinValue * .75 + perlinValue2 * .25) * _WindPower * _WindSpeed; 
 
     //float c2Offset = pow(.33, _WindPower) * (_WindAmplitude / 100) * sin(_Time * blade.hash * 6.283 * _WindSpeed) * perlinValue;
     //float c3Offset = pow(.66, _WindPower) * (_WindAmplitude / 100) * sin(_Time * blade.hash * 6.283 * _WindSpeed) * perlinValue;     

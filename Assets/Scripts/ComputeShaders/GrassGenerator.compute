@@ -17,10 +17,12 @@ static const float3 up = float3(0,1,0);
 
 cbuffer GrassShape 
 {
-    float2 height;
-    float2 tilt;
-    float2 bend;
-    float2 padding;
+    float grassLength;
+    float tilt;
+    float bend;
+    float lengthVariance;
+    float tiltVariance;
+    float bendVariance;
 };
 
 // Gpu math optimizations were causing flickering, so they've been disabled with the precise keyword
@@ -132,40 +134,26 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // The position and voronoi will be used to generate random values that will be used to shape each grass blade
         float2 clumpFacing = normalize(tan(rand2(voronoiCell) + float2(.31, 3.1267)) * 2.0f - 1);
         float2 facing2D = normalize(rand2(worldPos.xz) * 2.0f - 1); // Between -1 and 1
-        float2 combinedFacing = normalize(lerp(facing2D, clumpFacing, clumpDirection)); // Turns by clump direction parameter
-        float3 facing = float3(combinedFacing.x, 0, combinedFacing.y);
-        float3 widthDir = float3(combinedFacing.y, 0, -combinedFacing.x); // Orthogonal normal to facing
+        float2 facing = normalize(lerp(facing2D, clumpFacing, clumpDirection)); // Turns by clump direction parameter
+        float3 widthDir = float3(facing.y, 0, -facing.x); // Orthogonal normal to facing
         
-        float bladeHeight = height.x;// + (rand(worldPos.xxy) * 2 - 1) * height.y;
-        float bladeTilt = tilt.x;// + (rand(worldPos.yxx) * 2 - 1) * tilt.y;
-        float bladeBend = bend.x;// + (rand(worldPos.xyx) * 2 - 1) * bend.y;
+        float bladeLength = clamp(grassLength + (rand(worldPos.xxy) * 2 - 1) * lengthVariance, .01f, 10.0f);
+        float bladeTilt = clamp(tilt + (rand(worldPos.yxx) * 2 - 1) * tiltVariance, .01f, .99f);
+        float bladeBend = clamp(bend + (rand(worldPos.xyx) * 2 - 1) * bendVariance, 0.0f, 2.0f);
         
         // PART 4:
         // Get the four control points of the Cubic Bézier Curve that will determine the blades shape
         float3 p0 = float3(0,0,0); // Root of the grass blade in object space.
-        float3 p1 = p0 + up * (bladeHeight * bladeBend); // Above the starting point. Controls how rigid the base is.
-        float3 p3 = p0 + facing * bladeTilt + up * bladeHeight; // Endpoint is based on height and tilt.
-
+        float p3y = bladeTilt * bladeLength;
+        float p3x = sqrt(bladeLength * bladeLength - p3y * p3y);
+        float3 p3 = float3(p3x * facing.x, p3y, p3x * facing.y); // Tip of the blade. Rotated to point in facing direction
+        
         float3 bladeDir = normalize(p3);
-        float3 diff = p3 - p0;
-        float3 midPoint = 0.5f * diff;
         float3 awayDir = normalize(cross(-widthDir, bladeDir));
 
         // Towards the middle and away from the blade. Predominantly controls how bent the blade is
-        float3 p2 = p0 + midPoint + awayDir * bladeBend;
-
-
-        // Wind is probably also better done at this point. I'll get back to that later
-        /*if (swaying == 1.0f) {
-            float phaseOffset = blade.height * 1.57;
-            float rawSpeedMult = 2.0 * (blade.height + 1.0) * (windStrength + 1.0);
-            float speedMult = round(rawSpeedMult); // Force to integer multiples, confirms loop
-            float maxAmplitude = 0.01 * (windStrength + 3.0);
-            float timeMod = _Time[1] % (2.0 * acos(-1.0));
-            p3 = p3 + sin(timeMod*speedMult + phaseOffset) * maxAmplitude * awayDir;
-            p2 = p2 + sin(timeMod*speedMult + 1.57 + phaseOffset) * maxAmplitude / 2.0 * awayDir;
-        }*/
-
+        float3 p1 = p3 * .33f + awayDir * bladeBend * .5f;
+        float3 p2 = p3 * .66f + awayDir * bladeBend * .75f;
         
         // PART 5:
         // Put together the struct for the blade and make sure it is visible
@@ -174,7 +162,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         newBladePosition.xz = lerp(worldPos.xz, voronoiCell, clumpSeparation);
         blade.position = newBladePosition;
         blade.hash = rand(worldPos.xyy);
-        blade.dimensions = float2(-.2f, bladeTilt); // Tilt is the length (Which most closely follows arcLength)
+        blade.dimensions = float2(-.2f, bladeLength); // Tilt is the length (Which most closely follows arcLength)
         blade.widthDir = widthDir;
 
         if (!isVisible(newBladePosition)) continue;

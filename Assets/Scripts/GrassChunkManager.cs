@@ -140,8 +140,9 @@ public class GrassChunkManager : MonoBehaviour
         
         // Padding is added to the width because the way grass blades are rotated and sized means they can extend outside
         // the strict chunk boundaries. This would cause some very visible culling as you turn away from or walk between chunks.
-        // Padding is based on the grassShape parameters because it specifies the max height and reach of the blades
-        Vector3 chunkPadding = new(grassShape.tilt.y, grassShape.height.y, grassShape.tilt.y);
+        // Padding is based on the grassShape parameters because it specifies the max reach of the blades
+        float maxLength = grassShape.grassLength + grassShape.lengthVariance / 2.0f;
+        Vector3 chunkPadding = new(maxLength, maxLength, maxLength);
 
         int i = 0;
         for (int x = 0; x < chunksPerSide; x++)
@@ -256,7 +257,10 @@ public class GrassChunkManager : MonoBehaviour
 [StructLayout(LayoutKind.Sequential, Pack = 32)]
 public struct GrassShape
 {
-    public Vector2 height;
-    public Vector2 tilt;
-    public Vector2 bend;
+    [Range(0,5)] public float grassLength;
+    [Range(0,1)] public float tilt;
+    [Range(0,1)] public float bend;
+    [Range(0,1)] public float lengthVariance;
+    [Range(0,.5f)] public float tiltVariance;
+    [Range(0,.5f)] public float bendVariance;
 };

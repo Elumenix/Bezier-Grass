@@ -130,10 +130,10 @@ Material:
     - _Thickness: 0.1
     - _Translucency: 1
     - _ViewAdj: 0
-    - _WindAmplitude: 8.7
-    - _WindPower: 0.55
-    - _WindScale: 0.134
-    - _WindSpeed: 0
+    - _WindAmplitude: 5.7
+    - _WindPower: 0.61
+    - _WindScale: 0.118
+    - _WindSpeed: 0.91
     - _WorkflowMode: 1
     - _ZWrite: 1
     - adjustmentStrength: 0.758
@@ -143,7 +143,7 @@ Material:
     m_Colors:
     - _Attenuation: {r: 0.2, g: 0.8, b: 0.3, a: 1}
     - _BaseColor: {r: 0.12923352, g: 0.8301887, b: 0.090067655, a: 1}
-    - _Color: {r: 0.24670699, g: 0.6792453, b: 0.24670699, a: 1}
+    - _Color: {r: 0.27500895, g: 0.5660378, b: 0.27500895, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _LodRange: {r: 25, g: 50, b: 0, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}

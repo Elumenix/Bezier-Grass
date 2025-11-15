@@ -16,7 +16,7 @@ Shader "Custom/Grass"
         
         [Header(Blade Behavior)]
         _WindScale ("Wind Scale", Range(0.0, 1.0)) = .5
-        _WindPower ("Wind Power", Range(0.0, 5.0)) = 1.0
+        _WindPower ("Wind Power", Range(0.0, 1.5)) = .25
         _WindAmplitude ("Wind Amplitude", Range(0.0, 20.0)) = 10.0
         _WindSpeed ("Wind Speed", Range(0.0, 5.0)) = 1.5
         _LodRange ("LOD Range", Vector) = (200, 500, 0, 0)

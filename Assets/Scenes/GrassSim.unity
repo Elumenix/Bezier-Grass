@@ -380,12 +380,16 @@ MonoBehaviour:
   grassComputeShader: {fileID: 7200000, guid: 41794ce6da9a3544d9b3e27fa2250cd1, type: 3}
   chunksPerSide: 16
   grassShapeRange:
-    height: {x: 0.5, y: 2}
-    tilt: {x: 0.5, y: 1}
-    bend: {x: 0.1, y: 0.5}
+    grassLength: 2.17
+    tilt: 0.631
+    bend: 0.522
+    lengthVariance: 0.631
+    tiltVariance: 0.146
+    bendVariance: 0.111
   patternSize: 50
   scale: 5
-  clumpSeparation: 0.15
+  clumpSeparation: 0.032
+  clumpDirection: 0.325
 --- !u!4 &1585979608
 Transform:
   m_ObjectHideFlags: 0
