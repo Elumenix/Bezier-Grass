@@ -10,7 +10,6 @@ struct GrassBlade
 {
     float3 position;
     float hash;
-    float3 nearestClumpPosition;
     float2 dimensions;
     float3 widthDir;
     float4x3 coefficients;
@@ -60,7 +59,6 @@ GrassBlade CreateGrassBlade(TestGrassBlade blade)
 {
     GrassBlade newBlade;
 
-    newBlade.nearestClumpPosition = float3(0,0,0);
     newBlade.position = blade.position;
     newBlade.dimensions = float2(blade.width, blade.tilt);
     newBlade.hash = .34982983f; // Doesn't matter in testing really

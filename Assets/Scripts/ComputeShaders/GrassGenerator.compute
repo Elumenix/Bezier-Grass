@@ -9,6 +9,7 @@ float4 frustumData[6];
 uint patternSize;
 float scale;
 float clumpSeparation;
+float clumpDirection;
 float grassDist;
 float3 startPosition;
 float mapSize; // Assumes perfectly square map
@@ -25,14 +26,21 @@ cbuffer GrassShape
 // Gpu math optimizations were causing flickering, so they've been disabled with the precise keyword
 precise float2 rand2(float2 p)
 {
-    return frac(sin(float2(dot(p, float2(127.1, 311.7)), dot(p, float2(269.5, 183.3)))) * 43758.5453);
+    float3 p3 = frac(float3(p.xyx) * float3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yzx+33.33);
+    return frac((p3.xx+p3.yz)*p3.zy);
 }
 
-float pcg_float(uint input) {
+float rand(float3 p)
+{
+    return frac(sin(dot(p.xyz, float3(12.9898, 78.233, 53.539))) * 43758.5453);
+}
+
+/*float pcg_float(uint input) {
     uint state = input * 747796405u + 2891336453u;
     uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
     return float((word >> 22u) ^ word) * (1.0f / 4294967295.0f);
-}
+}*/
 
 bool isVisible(float3 bladePos)
 {
@@ -122,22 +130,15 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
         // PART 3:
         // The position and voronoi will be used to generate random values that will be used to shape each grass blade
-        // Use pcg hashes (based on this grass blades position) to get multiple random numbers quickly
-        uint seed = worldPos.x + worldPos.z * 1000u;
-        float random1 = pcg_float(seed + 0u);
-        float random2 = pcg_float(seed + 1u);
-        float random3 = pcg_float(seed + 2u);
-        float random4 = pcg_float(seed + 3u);
-        float random5 = pcg_float(seed + 4u);
-        float random6 = pcg_float(seed + 5u);
+        float2 clumpFacing = normalize(tan(rand2(voronoiCell) + float2(.31, 3.1267)) * 2.0f - 1);
+        float2 facing2D = normalize(rand2(worldPos.xz) * 2.0f - 1); // Between -1 and 1
+        float2 combinedFacing = normalize(lerp(facing2D, clumpFacing, clumpDirection)); // Turns by clump direction parameter
+        float3 facing = float3(combinedFacing.x, 0, combinedFacing.y);
+        float3 widthDir = float3(combinedFacing.y, 0, -combinedFacing.x); // Orthogonal normal to facing
         
-        float bladeHeight = random1 * (height.y - height.x) + height.x;
-        float2 facing2D = /*normalize(voronoiCell - offsetPos);*/ normalize(float2(random2, random3) * 2.0f - 1); // Between -1 and 1
-        float bladeTilt = random4 * (tilt.y - tilt.x) + tilt.x;
-        float bladeBend = random5 * (bend.y - bend.x) + bend.x;
-        float3 facing = float3(facing2D.x, 0, facing2D.y);
-        float3 widthDir = float3(facing2D.y, 0, -facing2D.x); // Orthogonal normal to facing
-
+        float bladeHeight = height.x;// + (rand(worldPos.xxy) * 2 - 1) * height.y;
+        float bladeTilt = tilt.x;// + (rand(worldPos.yxx) * 2 - 1) * tilt.y;
+        float bladeBend = bend.x;// + (rand(worldPos.xyx) * 2 - 1) * bend.y;
         
         // PART 4:
         // Get the four control points of the Cubic Bézier Curve that will determine the blades shape
@@ -167,13 +168,12 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
         
         // PART 5:
-        // Put together the struct for the blade, then add it to the buffer so that the game will render it.
+        // Put together the struct for the blade and make sure it is visible
         GrassBlade blade;
-        float2 clumpDistance = (voronoiCell - worldPos.xz) * clumpSeparation;
-        float3 newBladePosition = worldPos + float3(clumpDistance.x, 0, clumpDistance.y);
+        float3 newBladePosition = worldPos;
+        newBladePosition.xz = lerp(worldPos.xz, voronoiCell, clumpSeparation);
         blade.position = newBladePosition;
-        blade.hash = random6;
-        blade.nearestClumpPosition = float3(closestCellPos.x, bladeTilt, closestCellPos.y);
+        blade.hash = rand(worldPos.xyy);
         blade.dimensions = float2(-.2f, bladeTilt); // Tilt is the length (Which most closely follows arcLength)
         blade.widthDir = widthDir;
 

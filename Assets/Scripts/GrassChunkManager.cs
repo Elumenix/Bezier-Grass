@@ -26,6 +26,7 @@ public class GrassChunkManager : MonoBehaviour
     [Range(1, 128)] public int patternSize;
     [Range(0, 100)] public float scale = 32;
     [Range(0, 1)] public float clumpSeparation = .15f;
+    [Range(0, 1)] public float clumpDirection = .15f;
     
     // Chunk management
     //private Dictionary<Vector2Int, GrassChunk> activeChunks = new Dictionary<Vector2Int, GrassChunk>();
@@ -49,6 +50,7 @@ public class GrassChunkManager : MonoBehaviour
     private static readonly int PatternSize = Shader.PropertyToID("patternSize");
     private static readonly int ClumpSeparation = Shader.PropertyToID("clumpSeparation");
     private static readonly int MapSize = Shader.PropertyToID("mapSize");
+    private static readonly int ClumpDirection = Shader.PropertyToID("clumpDirection");
 
     private void Awake()
     {
@@ -128,6 +130,7 @@ public class GrassChunkManager : MonoBehaviour
         grassComputeShader.SetFloat(GrassDist, grassDist);
         grassComputeShader.SetFloat(PatternSize, patternSize);
         grassComputeShader.SetFloat(ClumpSeparation, clumpSeparation);
+        grassComputeShader.SetFloat(ClumpDirection, clumpDirection);
         grassComputeShader.SetFloat(MapSize, terrainSize.x);
         
         // Set up chunk tracking 
@@ -180,6 +183,7 @@ public class GrassChunkManager : MonoBehaviour
             grassComputeShader.SetFloat(GrassDist, grassDist);
             grassComputeShader.SetFloat(PatternSize, patternSize);
             grassComputeShader.SetFloat(ClumpSeparation, clumpSeparation);
+            grassComputeShader.SetFloat(ClumpDirection, clumpDirection);
             grassComputeShader.SetFloat(MapSize, terrainSize.x);
         }
         

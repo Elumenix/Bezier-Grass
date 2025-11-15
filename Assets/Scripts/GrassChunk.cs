@@ -33,7 +33,7 @@ public class GrassChunk
     {
         coordinate = chunkCoord;
         bounds = GetChunkBounds(ref chunkPadding);
-        grassBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Append, 4096, sizeof(float) * 24);
+        grassBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Append, 4096, sizeof(float) * 21);
         rp = new RenderParams(GrassChunkManager.grassMaterial)
         {
             matProps = new MaterialPropertyBlock()
