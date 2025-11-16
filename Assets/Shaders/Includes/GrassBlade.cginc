@@ -91,28 +91,21 @@ GrassBlade CreateGrassBlade(TestGrassBlade blade)
 
 void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 tangentVec)
 {
-    float perlinValue = perlin(blade.position.xz * _WindScale + _WindSpeed * _Time.y);
-    float perlinValue2 = perlin((blade.position.xz + float2(134.26, -1035.98)) * _WindScale + _WindSpeed * _Time.y * .5);
-    float pValue = (perlinValue * .75 + perlinValue2 * .25) * _WindPower * _WindSpeed; 
-
-    //float c2Offset = pow(.33, _WindPower) * (_WindAmplitude / 100) * sin(_Time * blade.hash * 6.283 * _WindSpeed) * perlinValue;
-    //float c3Offset = pow(.66, _WindPower) * (_WindAmplitude / 100) * sin(_Time * blade.hash * 6.283 * _WindSpeed) * perlinValue;     
-    
     // PART 1:
     // Get the position of the point along the curve. The exact position of the control points for this blade of grass
     // have already been computed in the compute shader and converted to coefficients. This was done so that every grass
     // blade only needs to do this operation 1 time per chunk update, rather than for every vertex of the blade every frame.
     float3 c0 = blade.coefficients[0];
     float3 c1 = blade.coefficients[1];
-    float3 c2 = blade.coefficients[2] - float3(sin(pValue), sin(pValue), 0);
-    float3 c3 = blade.coefficients[3] - float3(sin(pValue), sin(pValue), 0);
+    float3 c2 = blade.coefficients[2];
+    float3 c3 = blade.coefficients[3];
     
     // Get the correct point along the Bézier curve. Using mad operations as an optimization
     // float3 pos = c3t^3 + c2t^2 + c1t + c0
     // float3 pos = ((c3 * t + c2) * t + c1) * t + c0;
     pos = mad(mad(mad(c3, t, c2), t, c1), t, c0);
 
-
+    
     // PART 2:
     // Now we need to get the derivative of the cubic Bézier curve in order to get the proper normal for the blade of grass.
     // The derivative of a cubic Bézier curve is a quadratic Bézier curve, which we can easily calculate and simplify for.
@@ -144,7 +137,59 @@ void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 
 
     // Similar mad operations are used again for the derivative point as an optimization
     float3 derivative = mad(mad(dc2, t, dc1), t, dc0);
-    tangentVec = normalize(derivative);
+
+    // Not normalized because it simplifies the math in CalculateWindDisplacement
+    // If not calling that function, tangentVec should be immediately normalized before use
+    tangentVec = derivative;
+}
+
+void CalculateWindDisplacement(GrassBlade blade, float t, in out float3 pos, in out float3 tangentVec)
+{
+    // PART 1
+    // Calculate wind and offset the vertices of the blade by it to create a natural wind pattern across the map
+    
+    // Per-blade random value (consistent for each blade based on its position)
+    float bladeRandom = frac(sin(dot(blade.position.xz, float2(12.9898, 78.233))) * 43758.5453);
+    
+    // Two noises at different speeds and weights so that there isn't an obvious pattern
+    // Second noise also accounts for some per-blade randomness, so all nearby blades don't act exactly identical
+    float perlinValue = perlin(blade.position.xz * _WindScale + _WindSpeed * _Time.y);
+    float perlinValue2 = perlin((blade.position.xz + float2(134.26, -1035.98) + bladeRandom * 50.0) * _WindScale + _WindSpeed * _Time.y * .5);
+
+    // Wind should only have strength if it is actually moving
+    float windStrength = (perlinValue * .75 + perlinValue2 * .25) * _WindPower * _WindSpeed;
+    windStrength *= lerp(0.25, 1.5, bladeRandom); // Each blade 25% to 150% responsive
+
+    // TODO: Should add option to change wind direction
+    float3 windDir = normalize(float3(-1.3,0,2.4));
+
+    float heightFactor = t * t; // falloff so that tip reacts more
+    float bendAmount = windStrength * heightFactor;
+
+    // Create a bending offset that moves in the wind direction but accounts for blade orientation
+    // Project wind direction onto the plane perpendicular to the tangent
+    float3 horizontalWind = windDir - dot(windDir, tangentVec) * tangentVec;
+    horizontalWind = normalize(horizontalWind);
+
+    // Calculate the bend displacement
+    // This will cause some major stretching under the map at high wind values but those are never visible
+    float3 bendOffset = horizontalWind * bendAmount;
+    bendOffset.y -= bendAmount * bendAmount * 0.5;
+    pos += bendOffset;
+
+    // PART 2
+    // Recalculate the tangent vector as it was changed along with the blades shape 
+    
+    // Calculate how wind changes with height (derivative of bendOffset with respect to t)
+    float dHeightFactor = 2 * t; // derivative of t^2
+    float dBendAmount = windStrength * dHeightFactor;
+
+    // Wind contribution to the derivative
+    float3 windTangentContribution = horizontalWind * dBendAmount;
+    windTangentContribution.y -= bendAmount * t; // derivative of the vertical component
+
+    // Add wind effect to the tangent. Sum of the derivatives is still the derivative.
+    tangentVec = tangentVec + windTangentContribution;
 }
 
 float3 ViewSpaceAdjustment(GrassBlade blade, float3 pos, float3 tangentVec)

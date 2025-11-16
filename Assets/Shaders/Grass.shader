@@ -15,9 +15,8 @@ Shader "Custom/Grass"
         _AdjustmentStrength ("Adjustment Strength", Range(0.0,1.0)) = 0.75
         
         [Header(Blade Behavior)]
-        _WindScale ("Wind Scale", Range(0.0, 1.0)) = .5
-        _WindPower ("Wind Power", Range(0.0, 1.5)) = .25
-        _WindAmplitude ("Wind Amplitude", Range(0.0, 20.0)) = 10.0
+        _WindScale ("Wind Scale", Range(0.0, .25)) = .1
+        _WindPower ("Wind Power", Range(0.0, 10)) = .75
         _WindSpeed ("Wind Speed", Range(0.0, 5.0)) = 1.5
         _LodRange ("LOD Range", Vector) = (200, 500, 0, 0)
     }
@@ -35,8 +34,8 @@ Shader "Custom/Grass"
 
         // All data for grass shape is stored on the cpu for efficiency rather than needing to be passed every frame
         // This also means that all instances of this shader share this data rather than every chunk/instance needing it's own version
-        static const half arcTBuffer[8] = { 0.001f, 0.2f, 0.3f, 0.48f, 0.69f, 0.81f, 0.91f, 1.0f };
-        static const half lodTBuffer[8] = { 0.001f, 0.001f, 0.001f, 0.5f, 0.8f, 1.0f, 1.0f, 1.0f };
+        static const half arcTBuffer[8] = { 0.001f, 0.45f, 0.65f, 0.76f, 0.85f, 0.91f, 0.95f, 1.0f };
+        static const half lodTBuffer[8] = { 0.001f, 0.001f, 0.001f, 0.55f, 0.8f, 1.0f, 1.0f, 1.0f };
         static const half arcLODBuffer[4] = { 0.001f, 0.5f, 0.8f, 1.0f };
         StructuredBuffer<GrassBlade> grassBlades; // From the compute shader
         ENDHLSL
@@ -98,6 +97,8 @@ Shader "Custom/Grass"
                 float3 pos;
                 float3 tangentVec;
                 CalculateBezierCurve(blade, t, pos, tangentVec);
+                CalculateWindDisplacement(blade, t, pos, tangentVec);
+                tangentVec = normalize(tangentVec); // Was unnormalized to this point because it simplified math in wind displacement
             
                 // Blade will get skinnier the further up it goes, with the last one being along the center
                 float sideOffset = blade.dimensions.x - (blade.dimensions.x * t * t);
