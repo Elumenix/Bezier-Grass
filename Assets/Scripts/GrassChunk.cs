@@ -24,7 +24,7 @@ public class GrassChunk
     private Vector3 chunkStart;
     
     // Saved shader property to prevent string lookup
-    private static readonly int StartPosition = Shader.PropertyToID("startPosition");
+    private static readonly int StartPosition = Shader.PropertyToID("tileStartPosition");
     private static readonly int GrassBlades = Shader.PropertyToID("grassBlades");
     private static readonly int GrassLodMode = Shader.PropertyToID("_GrassLodMode");
 

@@ -158,7 +158,7 @@ void CalculateWindDisplacement(GrassBlade blade, float t, in out float3 pos, in 
 
     // Wind should only have strength if it is actually moving
     float windStrength = (perlinValue * .75 + perlinValue2 * .25) * _WindPower * _WindSpeed;
-    windStrength *= lerp(0.25, 1.5, bladeRandom); // Each blade 25% to 150% responsive
+    windStrength *= lerp(0.70, 1.5, bladeRandom); // Each blade 70% to 150% responsive
 
     // TODO: Should add option to change wind direction
     float3 windDir = normalize(float3(-1.3,0,2.4));

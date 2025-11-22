@@ -1,9 +1,10 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
-using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
 
 public class GrassChunkManager : MonoBehaviour
@@ -49,8 +50,10 @@ public class GrassChunkManager : MonoBehaviour
     private static readonly int FrustumData = Shader.PropertyToID("frustumData");
     private static readonly int PatternSize = Shader.PropertyToID("patternSize");
     private static readonly int ClumpSeparation = Shader.PropertyToID("clumpSeparation");
-    private static readonly int MapSize = Shader.PropertyToID("mapSize");
     private static readonly int ClumpDirection = Shader.PropertyToID("clumpDirection");
+    private static readonly int HeightTex = Shader.PropertyToID("heightTex");
+    private static readonly int HeightScale = Shader.PropertyToID("heightScale");
+    private static readonly int MapBounds = Shader.PropertyToID("mapBounds");
 
     private void Awake()
     {
@@ -91,6 +94,34 @@ public class GrassChunkManager : MonoBehaviour
         };
         lowResIndexBuffer = new GraphicsBuffer(Target.Index, 15, sizeof(uint));
         lowResIndexBuffer.SetData(indicesLOD);
+
+        // 512x512 heightmap is being interpolated from the default 513x513 one. These values are pretty similar, so it
+        // won't look bad and the 512x512 is much better for passing to the gpu.
+        float[,] heightData = terrain.terrainData.GetHeights(0, 0, 512, 512);
+        
+        // Native array will be used to skip color array packing which would be needed for making texure2ds
+        NativeArray<float> heights1D = new NativeArray<float>(512 * 512, Allocator.Temp);
+
+        // Unfortunately, we need to convert this 2D array into a 1D color array to fit it in a Texture2D
+        // Parallel For is synchronous, so it should make this much faster than it would otherwise be
+        Parallel.For(0, 512, y =>
+        {
+            for (int x = 0; x < 512; x++)
+            {
+                // This is still in the (0-1) range to work as color floats
+                heights1D[y * 512 + x] = heightData[y, x];
+            }
+        });
+        
+        // Create the Texture2D
+        Texture2D heightMap = new Texture2D(512, 512, TextureFormat.RFloat, false, true);
+        heightMap.SetPixelData(heights1D, 0);
+        heightMap.Apply();
+        heights1D.Dispose();
+        
+        // Send height data to compute shader
+        grassComputeShader.SetTexture(0, HeightTex, heightMap);
+        grassComputeShader.SetFloat(HeightScale, terrain.terrainData.size.y);
         
         grassDesc = new GraphicsBuffer(Target.Constant, 1, sizeof(float) * 6);
         grassDesc.SetData(new [] { grassShape });
@@ -118,31 +149,19 @@ public class GrassChunkManager : MonoBehaviour
 
     private void InitializeChunks()
     {
-        terrainPosition = terrain.transform.position;
-        terrainSize = terrain.terrainData.size;
-        
-        // Terrain may not be perfectly square. The chunks should be though
-        chunkSize = terrainSize.x / chunksPerSide;
-        float grassDist = chunkSize / 128.0f;
-        
-        // At this point, some information based on chunk positioning for the compute shader will be set and stay unchanged
-        grassComputeShader.SetFloat(Scale, scale);
-        grassComputeShader.SetFloat(GrassDist, grassDist);
-        grassComputeShader.SetFloat(PatternSize, patternSize);
-        grassComputeShader.SetFloat(ClumpSeparation, clumpSeparation);
-        grassComputeShader.SetFloat(ClumpDirection, clumpDirection);
-        grassComputeShader.SetFloat(MapSize, terrainSize.x);
+        SetChunkParams();
         
         // Set up chunk tracking 
         totalChunkCount = new Vector2Int(chunksPerSide, chunksPerSide);
         activeChunks = new GrassChunk[totalChunkCount.x * totalChunkCount.y];
-        Vector3 cameraPos = mainCamera.transform.position; //SceneView.lastActiveSceneView.camera.transform.position;
+        Vector3 cameraPos = mainCamera.transform.position; //SceneView.lastActiveSceneView.camera.transform.position; Scene view camera
         
         // Padding is added to the width because the way grass blades are rotated and sized means they can extend outside
         // the strict chunk boundaries. This would cause some very visible culling as you turn away from or walk between chunks.
         // Padding is based on the grassShape parameters because it specifies the max reach of the blades
+        // Because of hills, the terrainData height needs to be added to the y parameter to not accidentally cull hills
         float maxLength = grassShape.grassLength + grassShape.lengthVariance / 2.0f;
-        Vector3 chunkPadding = new(maxLength, maxLength, maxLength);
+        Vector3 chunkPadding = new(maxLength, maxLength + terrain.terrainData.size.y, maxLength);
 
         int i = 0;
         for (int x = 0; x < chunksPerSide; x++)
@@ -160,6 +179,29 @@ public class GrassChunkManager : MonoBehaviour
             }
         }  
     }
+
+    // Sets chunk params in the compute shader that will affect all chunks
+    void SetChunkParams()
+    {
+        terrainPosition = terrain.transform.position;
+        terrainSize = terrain.terrainData.size;
+        
+        // Terrain and chunks should be perfectly square
+        chunkSize = terrainSize.x / chunksPerSide;
+        float grassDist = chunkSize / 128.0f;
+
+        Vector4 mapBounds = new Vector4(terrainPosition.x, terrainPosition.z, terrainPosition.x + terrainSize.x,
+            terrainPosition.z + terrainSize.z);
+        
+        
+        // At this point, some information based on chunk positioning for the compute shader will be set and stay unchanged
+        grassComputeShader.SetFloat(Scale, scale);
+        grassComputeShader.SetFloat(GrassDist, grassDist);
+        grassComputeShader.SetFloat(PatternSize, patternSize);
+        grassComputeShader.SetFloat(ClumpSeparation, clumpSeparation);
+        grassComputeShader.SetFloat(ClumpDirection, clumpDirection);
+        grassComputeShader.SetVector(MapBounds, mapBounds);
+    }
     
     void Update()
     {
@@ -171,21 +213,7 @@ public class GrassChunkManager : MonoBehaviour
             grassDesc.SetData(new [] { grassShape });
             grassComputeShader.SetConstantBuffer(Shape, grassDesc, 0, 32);
             
-            
-            terrainPosition = terrain.transform.position;
-            terrainSize = terrain.terrainData.size;
-        
-            // Terrain may not be perfectly square. The chunks should be though
-            chunkSize = terrainSize.x / chunksPerSide;
-            float grassDist = chunkSize / 128.0f;
-        
-            // At this point, some information based on chunk positioning for the compute shader will be set and stay unchanged
-            grassComputeShader.SetFloat(Scale, scale);
-            grassComputeShader.SetFloat(GrassDist, grassDist);
-            grassComputeShader.SetFloat(PatternSize, patternSize);
-            grassComputeShader.SetFloat(ClumpSeparation, clumpSeparation);
-            grassComputeShader.SetFloat(ClumpDirection, clumpDirection);
-            grassComputeShader.SetFloat(MapSize, terrainSize.x);
+            SetChunkParams();
         }
         
         UpdateActiveChunks();
@@ -223,25 +251,9 @@ public class GrassChunkManager : MonoBehaviour
             if (GeometryUtility.TestPlanesAABB(frustumPlanes, chunk.bounds))
             {
                 chunk.CalculateAndDrawChunk(ref grassComputeShader,ref cameraPos);
-                //chunk.DrawChunk();
             }
         }
     }
-    
-    /*int GetChunkSeed(Vector2Int coord)
-    {
-        // Generate consistent seed based on chunk coordinates
-        return coord.x * 73856093 ^ coord.y * 19349663;
-    }
-    
-    void DestroyChunk(Vector2Int coord)
-    {
-        if (activeChunks.TryGetValue(coord, out GrassChunk chunk))
-        {
-            chunk.Dispose();
-            activeChunks.Remove(coord);
-        }
-    }*/
     
     void OnDestroy()
     {
@@ -257,10 +269,10 @@ public class GrassChunkManager : MonoBehaviour
 [StructLayout(LayoutKind.Sequential, Pack = 32)]
 public struct GrassShape
 {
-    [Range(0,5)] public float grassLength;
+    [Range(0,10)] public float grassLength;
     [Range(0,1)] public float tilt;
     [Range(0,1)] public float bend;
-    [Range(0,1)] public float lengthVariance;
+    [Range(0,5)] public float lengthVariance;
     [Range(0,.5f)] public float tiltVariance;
     [Range(0,.5f)] public float bendVariance;
 };
