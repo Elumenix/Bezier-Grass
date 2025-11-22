@@ -11,6 +11,7 @@ public class GrassChunkManager : MonoBehaviour
 {
     [Header("Debug")] 
     public bool updateEveryFrame = false;
+    public bool useSceneCamera = false;
     
     [Header("Terrain Setup")]
     [SerializeField] private Terrain terrain;
@@ -20,6 +21,7 @@ public class GrassChunkManager : MonoBehaviour
     
     [Header("Grass Settings")]
     [Range(1, 128)] public int chunksPerSide;
+    [Range(1, 200)] public float swapRange;
     [SerializeField] private GrassShape grassShapeRange; 
     private static GrassShape grassShape;
     
@@ -54,6 +56,8 @@ public class GrassChunkManager : MonoBehaviour
     private static readonly int HeightTex = Shader.PropertyToID("heightTex");
     private static readonly int HeightScale = Shader.PropertyToID("heightScale");
     private static readonly int MapBounds = Shader.PropertyToID("mapBounds");
+    private static readonly int CameraPos = Shader.PropertyToID("cameraPos");
+    private static readonly int SwapRange = Shader.PropertyToID("swapRange");
 
     private void Awake()
     {
@@ -154,7 +158,9 @@ public class GrassChunkManager : MonoBehaviour
         // Set up chunk tracking 
         totalChunkCount = new Vector2Int(chunksPerSide, chunksPerSide);
         activeChunks = new GrassChunk[totalChunkCount.x * totalChunkCount.y];
-        Vector3 cameraPos = mainCamera.transform.position; //SceneView.lastActiveSceneView.camera.transform.position; Scene view camera
+        Vector3 cameraPos = useSceneCamera
+            ? SceneView.lastActiveSceneView.camera.transform.position
+            : mainCamera.transform.position;
         
         // Padding is added to the width because the way grass blades are rotated and sized means they can extend outside
         // the strict chunk boundaries. This would cause some very visible culling as you turn away from or walk between chunks.
@@ -201,6 +207,7 @@ public class GrassChunkManager : MonoBehaviour
         grassComputeShader.SetFloat(ClumpSeparation, clumpSeparation);
         grassComputeShader.SetFloat(ClumpDirection, clumpDirection);
         grassComputeShader.SetVector(MapBounds, mapBounds);
+        grassComputeShader.SetFloat(SwapRange, swapRange);
     }
     
     void Update()
@@ -240,7 +247,8 @@ public class GrassChunkManager : MonoBehaviour
         }
         
         grassComputeShader.SetFloats(FrustumData, frustumData);
-        Vector3 cameraPos = SceneView.lastActiveSceneView.camera.transform.position; //mainCamera.transform.position;
+        Vector3 cameraPos = useSceneCamera ? SceneView.lastActiveSceneView.camera.transform.position : mainCamera.transform.position;
+        grassComputeShader.SetVector(CameraPos, cameraPos);
         
         // See if we should render each active chunk
         foreach (GrassChunk chunk in activeChunks)

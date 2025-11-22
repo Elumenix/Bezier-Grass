@@ -13,10 +13,12 @@ float heightScale;
 float clumpSeparation;
 float clumpDirection;
 float grassDist;
+float swapRange;
 
 // World space positions
 float3 tileStartPosition;
 float4 mapBounds; // Beginning xz, End xz
+float3 cameraPos;
 static const float3 up = float3(0,1,0);
 
 cbuffer GrassShape 
@@ -85,9 +87,12 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float h = heightTex.Load(int3(idX, idZ, 0)) * heightScale;
         worldPos.y = tileStartPosition.y + h;
 
+        float dist = distance(cameraPos, worldPos);
+
         // Early out if the blade wouldn't be visible. Don't add it to the appendBuffer because it shouldn't be rendered
         // This also takes some of the write contention away from the buffer for this chunks shader call
-        if (!isVisible(worldPos)) continue;
+        // Less blades are drawn in the distance because the user won't necessarily be able to see them anymore
+        if (dist > swapRange + i * swapRange || !isVisible(worldPos)) continue;
 
 
         // PART 2:

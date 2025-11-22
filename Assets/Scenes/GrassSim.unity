@@ -375,10 +375,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   updateEveryFrame: 0
+  useSceneCamera: 0
   terrain: {fileID: 2088398974}
   grassMat: {fileID: 2100000, guid: 348f0ac48fa547443bc63b5d7550a3cd, type: 2}
   grassComputeShader: {fileID: 7200000, guid: 41794ce6da9a3544d9b3e27fa2250cd1, type: 3}
   chunksPerSide: 16
+  swapRange: 115
   grassShapeRange:
     grassLength: 2.74
     tilt: 0.631
