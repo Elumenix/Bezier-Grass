@@ -215,11 +215,6 @@ float3 ViewSpaceAdjustment(GrassBlade blade, float3 pos, float3 tangentVec)
 
 half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT_FACE_SEMANTIC)
 {
-    /*float perlinValue = perlin(input.positionWS.xz * _WindScale + float2(1.3, -.3) * _Time.y);
-    float perlinValue2 = perlin((input.positionWS.xz + float2(134.26, -1035.98)) * _WindScale + float2(1.3, -.3) * _Time.y * 1.5);
-    
-    return half4(1-sin(perlinValue * perlinValue2),0,0,1);*/
-
     // Setting up some data ahead of time
     float facing = IS_FRONT_VFACE(isFrontFace, 1.0, -1.0);
     half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
