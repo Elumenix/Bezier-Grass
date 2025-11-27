@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Unity.Collections;
@@ -20,7 +21,7 @@ public class GrassChunkManager : MonoBehaviour
     public ComputeShader grassComputeShader;
     
     [Header("Grass Settings")]
-    [Range(1, 128)] public int chunksPerSide;
+    [Range(1, 32)] public int chunksPerSide;
     [Range(1, 200)] public float swapRange;
     [SerializeField] private GrassShape grassShapeRange; 
     private static GrassShape grassShape;
@@ -32,11 +33,10 @@ public class GrassChunkManager : MonoBehaviour
     [Range(0, 1)] public float clumpDirection = .15f;
     
     // Chunk management
-    //private Dictionary<Vector2Int, GrassChunk> activeChunks = new Dictionary<Vector2Int, GrassChunk>();
     private GrassChunk[] activeChunks;
-    private Vector2Int totalChunkCount;
     public static Vector3 terrainPosition;
     private Vector3 terrainSize;
+    private Dictionary<Vector2Int, GrassChunk> chunks; // Allows the reuse of chunks
     
     // Buffers and Shareables
     private GraphicsBuffer grassDesc;
@@ -149,15 +149,19 @@ public class GrassChunkManager : MonoBehaviour
         if (grassDesc == null) return;
         grassDesc.SetData(new [] { grassShape });
         grassComputeShader.SetConstantBuffer(Shape, grassDesc, 0, 32);
+
+        if (Time.frameCount <= 1 || !updateEveryFrame) return;
+        UpdateChunkList();
     }
 
     private void InitializeChunks()
     {
         SetChunkParams();
+
+        chunks = new Dictionary<Vector2Int, GrassChunk>();
         
         // Set up chunk tracking 
-        totalChunkCount = new Vector2Int(chunksPerSide, chunksPerSide);
-        activeChunks = new GrassChunk[totalChunkCount.x * totalChunkCount.y];
+        activeChunks = new GrassChunk[chunksPerSide * chunksPerSide];
         Vector3 cameraPos = useSceneCamera
             ? SceneView.lastActiveSceneView.camera.transform.position
             : mainCamera.transform.position;
@@ -177,9 +181,8 @@ public class GrassChunkManager : MonoBehaviour
                 Vector2Int coord = new Vector2Int(x, z);
                 GrassChunk chunk = new GrassChunk(coord, ref chunkPadding);
                 
-                // Immediately Call to fill the graphics buffers
-                chunk.CalculateAndDrawChunk(ref grassComputeShader, ref cameraPos);
-    
+                // Save chunk for use
+                chunks[coord] = chunk;
                 activeChunks[i] = chunk;
                 i++;
             }
@@ -194,7 +197,7 @@ public class GrassChunkManager : MonoBehaviour
         
         // Terrain and chunks should be perfectly square
         chunkSize = terrainSize.x / chunksPerSide;
-        float grassDist = chunkSize / 128.0f;
+        float grassDist = chunkSize / 64.0f;
 
         Vector4 mapBounds = new Vector4(terrainPosition.x, terrainPosition.z, terrainPosition.x + terrainSize.x,
             terrainPosition.z + terrainSize.z);
@@ -208,6 +211,58 @@ public class GrassChunkManager : MonoBehaviour
         grassComputeShader.SetFloat(ClumpDirection, clumpDirection);
         grassComputeShader.SetVector(MapBounds, mapBounds);
         grassComputeShader.SetFloat(SwapRange, swapRange);
+    }
+    
+    // This function will reallocate chunks in the program. 
+    // It will only run in debug mode if the user sets chunks to reUpdate every frame
+    private void UpdateChunkList()
+    {
+        // Calculate new total count
+        int newChunkCount = chunksPerSide * chunksPerSide;
+
+        // If nothing changed, skip
+        if (activeChunks != null && activeChunks.Length == newChunkCount) return;
+        
+        
+        chunkSize = terrainSize.x / chunksPerSide;
+        GrassChunk[] newActiveChunks = new GrassChunk[newChunkCount];
+        Vector3 cameraPos = useSceneCamera
+            ? SceneView.lastActiveSceneView.camera.transform.position
+            : mainCamera.transform.position;
+
+        // Padding calculation (same logic as InitializeChunks)
+        float maxLength = grassShape.grassLength + grassShape.lengthVariance / 2.0f;
+        Vector3 chunkPadding = new(maxLength, maxLength + terrain.terrainData.size.y, maxLength);
+
+        int i = 0;
+        for (int x = 0; x < chunksPerSide; x++)
+        {
+            for (int z = 0; z < chunksPerSide; z++)
+            {
+                Vector2Int coord = new Vector2Int(x, z);
+
+                GrassChunk chunk;
+                if (chunks.TryGetValue(coord, out var existing))
+                {
+                    // Keep existing chunk
+                    chunk = existing;
+                    chunk.RecalculateBounds(ref chunkPadding);
+                }
+                else
+                {
+                    // Create new grassChunk if one doesn't exist
+                    chunk = new GrassChunk(coord, ref chunkPadding);
+                    chunks[coord] = chunk;
+                }
+
+                newActiveChunks[i] = chunk;
+                i++;
+            }
+        }
+
+        // Replace old list
+        activeChunks = new GrassChunk[newChunkCount];
+        activeChunks = newActiveChunks;
     }
     
     void Update()
@@ -266,9 +321,9 @@ public class GrassChunkManager : MonoBehaviour
     void OnDestroy()
     {
         // Clean up all chunks
-        foreach (GrassChunk chunk in activeChunks)
+        foreach (KeyValuePair<Vector2Int, GrassChunk> chunk in chunks)
         {
-            chunk?.Dispose();
+            chunk.Value?.Dispose();
         }
     }
 }

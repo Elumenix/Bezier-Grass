@@ -14,8 +14,8 @@ struct IndirectDrawIndexedArgs
 
 public class GrassChunk
 {
-    public readonly Vector2Int coordinate;
-    public readonly Bounds bounds;
+    public readonly Vector2Int coord;
+    public Bounds bounds;
     private readonly GraphicsBuffer grassBuffer;
     private readonly GraphicsBuffer commandBuffer;
     private readonly GraphicsBuffer lowLodCommandBuffer;
@@ -31,7 +31,7 @@ public class GrassChunk
 
     public GrassChunk(Vector2Int chunkCoord, ref Vector3 chunkPadding)
     {
-        coordinate = chunkCoord;
+        coord = chunkCoord;
         bounds = GetChunkBounds(ref chunkPadding);
         grassBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Append, 4096, sizeof(float) * 21);
         rp = new RenderParams(GrassChunkManager.grassMaterial)
@@ -68,14 +68,12 @@ public class GrassChunk
     
     private Bounds GetChunkBounds(ref Vector3 chunkPadding)
     {
-        // TODO: This works for flat terrain currently, vertical bounds may need to change when adding hills
-
         // We'll reuse this variable a few times, so we'll put it on the local stack
         float chunkSize = GrassChunkManager.chunkSize;
         
         // Because unity's procedural instancing function still requires a bounds, we set it to the bounds for the chunk
         // The function treats rendering as all grass blades or no grass blades, so we make sure the bounds covers the whole chunk
-        chunkStart = GrassChunkManager.terrainPosition + new Vector3(coordinate.x * chunkSize, 0, coordinate.y * chunkSize);
+        chunkStart = GrassChunkManager.terrainPosition + new Vector3(coord.x * chunkSize, 0, coord.y * chunkSize);
         Vector3 chunkEnd = chunkStart + new Vector3(chunkSize, 0, chunkSize);
         Vector3 chunkCenter = (chunkStart + chunkEnd) * 0.5f;
         
@@ -85,6 +83,15 @@ public class GrassChunk
         Vector3 chunkWidth = (chunkEnd - chunkStart) * 0.5f + chunkPadding;
 
         return new Bounds(chunkCenter, chunkWidth * 2);
+    }
+
+    /// <summary>
+    /// Debug method to force chunk to recalculate the bounds if the programmer manually changes chunk dimensions for the grid.
+    /// </summary>
+    /// <param name="chunkPadding">How much boundary outside the chunk should not be culled to account for blade length</param>
+    public void RecalculateBounds(ref Vector3 chunkPadding)
+    {
+        bounds = GetChunkBounds(ref chunkPadding);
     }
 
     /// <summary>
