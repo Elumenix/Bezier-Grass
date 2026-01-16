@@ -219,14 +219,15 @@ half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT
     float facing = IS_FRONT_VFACE(isFrontFace, 1.0, -1.0);
     half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
     float3 normalDirWS = normalize(input.normalWS) * facing;
-    Light light = GetMainLight();
+    float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
+    Light light = GetMainLight(shadowCoord);
     
     // Set data needed to calculate lighting
     InputData lightData = (InputData)0;
     lightData.positionWS = input.positionWS;
     lightData.normalWS = normalDirWS;
     lightData.viewDirectionWS = viewDirWS;
-    lightData.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
+    lightData.shadowCoord = shadowCoord;
     lightData.bakedGI = SampleSH(lightData.normalWS);
     lightData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
     lightData.vertexLighting = VertexLighting(input.positionWS, normalDirWS);
@@ -238,16 +239,16 @@ half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT
     surfaceData.alpha = 1.0;
     surfaceData.smoothness = _Glossiness * lerp(.55f, 1.0f, input.uv.y);
     surfaceData.metallic = _Metallic;
-    surfaceData.occlusion = _Occlusion * lerp(.3f, 1.0f, input.uv.y);
+    surfaceData.occlusion = _Occlusion * lerp(.5f, 1.0f, input.uv.y);
                 
     // Apply PBR Lighting
     half4 pbr = UniversalFragmentPBR(lightData, surfaceData);
     
     // Subsurface scattering on back faces, so that the back of grass doesn't look as abnormally dark
-    half backLight = saturate(dot(-normalDirWS, light.direction));
+    half backLight = saturate(dot(-normalDirWS, light.direction)); // 0: towards light, 1: away from light
     half3 translucentLight = backLight * _Translucency * _Color.rgb;
     half3 subSurfaceLight = translucentLight * light.shadowAttenuation * light.distanceAttenuation * light.color;
-    return pbr + half4(subSurfaceLight, 1);
+    return half4(pbr.rgb + subSurfaceLight, pbr.a);
 }
 
 #endif

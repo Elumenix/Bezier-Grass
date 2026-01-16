@@ -34,7 +34,7 @@ Shader "Custom/Grass"
 
         // All data for grass shape is stored on the cpu for efficiency rather than needing to be passed every frame
         // This also means that all instances of this shader share this data rather than every chunk/instance needing it's own version
-        static const half arcTBuffer[8] = { 0.001f, 0.45f, 0.65f, 0.76f, 0.85f, 0.91f, 0.95f, 1.0f };
+        static const half arcTBuffer[8] = { 0.001f, 0.4f, 0.6f, 0.7f, 0.8f, 0.88f, 0.95f, 1.0f };
         static const half lodTBuffer[8] = { 0.001f, 0.001f, 0.001f, 0.55f, 0.8f, 1.0f, 1.0f, 1.0f };
         static const half arcLODBuffer[4] = { 0.001f, 0.5f, 0.8f, 1.0f };
         StructuredBuffer<GrassBlade> grassBlades; // From the compute shader
