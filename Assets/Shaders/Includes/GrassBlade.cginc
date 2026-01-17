@@ -12,6 +12,7 @@ struct GrassBlade
     float hash;
     float2 dimensions;
     float3 widthDir;
+    float3 terrainNormal;
     float4x3 coefficients;
 };
 
@@ -37,6 +38,7 @@ struct Varyings
     uint vertexID : TEXCOORD1;
     float3 normalWS : NORMAL;
     float2 uv : TEXCOORD2;
+    float3 terrainNormalWS : TEXCOORD3;
 };
 
 half4 _Color;
@@ -218,19 +220,24 @@ half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT
     // Setting up some data ahead of time
     float facing = IS_FRONT_VFACE(isFrontFace, 1.0, -1.0);
     half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
-    float3 normalDirWS = normalize(input.normalWS) * facing;
     float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
     Light light = GetMainLight(shadowCoord);
+
+    // normalDirWS is the normals for individual blades, which causes a lot of aliasing and not a lot of light-based
+    // reflections in the grass if used for everything. It's still needed for back-lighting/subsurface light, but
+    // terrain normal is better used for the PBR for a cleaner grass simulation
+    float3 normalDirWS = normalize(input.normalWS) * facing;
+    float3 terrainNormalWS = normalize(input.terrainNormalWS);
     
     // Set data needed to calculate lighting
     InputData lightData = (InputData)0;
     lightData.positionWS = input.positionWS;
-    lightData.normalWS = normalDirWS;
+    lightData.normalWS = terrainNormalWS;
     lightData.viewDirectionWS = viewDirWS;
     lightData.shadowCoord = shadowCoord;
-    lightData.bakedGI = SampleSH(lightData.normalWS);
+    lightData.bakedGI = SampleSH(terrainNormalWS);
     lightData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
-    lightData.vertexLighting = VertexLighting(input.positionWS, normalDirWS);
+    lightData.vertexLighting = VertexLighting(input.positionWS, terrainNormalWS);
                 
     // Surface data is for additional data from textures. 
     SurfaceData surfaceData;
@@ -245,6 +252,8 @@ half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT
     half4 pbr = UniversalFragmentPBR(lightData, surfaceData);
     
     // Subsurface scattering on back faces, so that the back of grass doesn't look as abnormally dark
+    // This isn't really as necessary anymore with terrain normals being used, but it can give the grass more texture
+    // especially helpful in higher lighting environments
     half backLight = saturate(dot(-normalDirWS, light.direction)); // 0: towards light, 1: away from light
     half3 translucentLight = backLight * _Translucency * _Color.rgb;
     half3 subSurfaceLight = translucentLight * light.shadowAttenuation * light.distanceAttenuation * light.color;

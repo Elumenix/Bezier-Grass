@@ -375,7 +375,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   updateEveryFrame: 0
-  useSceneCamera: 0
+  useSceneCamera: 1
   terrain: {fileID: 2088398974}
   grassMat: {fileID: 2100000, guid: 348f0ac48fa547443bc63b5d7550a3cd, type: 2}
   grassComputeShader: {fileID: 7200000, guid: 41794ce6da9a3544d9b3e27fa2250cd1, type: 3}
@@ -435,7 +435,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.9803922, g: 0.93725497, b: 0.8078432, a: 1}
+  m_Color: {r: 0.94117653, g: 0.82745105, b: 0.6862745, a: 1}
   m_Intensity: 1
   m_Range: 10
   m_SpotAngle: 30
@@ -498,13 +498,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1590524409}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.99745214, y: -0.002483555, z: 0.055765923, w: -0.04442188}
-  m_LocalPosition: {x: 121.87, y: 7.46, z: 110.9}
+  m_LocalRotation: {x: 0.99904823, y: 0, z: 0, w: 0.0436195}
+  m_LocalPosition: {x: 150, y: 10, z: 200.42}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 174.9, y: 366.4, z: 0}
+  m_LocalEulerAnglesHint: {x: 175, y: 0, z: 0}
 --- !u!114 &1590524412
 MonoBehaviour:
   m_ObjectHideFlags: 0

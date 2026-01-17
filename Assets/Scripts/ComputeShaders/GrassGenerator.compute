@@ -5,6 +5,7 @@
 // Our main goal here is to get instance information for each grass blade we will render
 AppendStructuredBuffer<GrassBlade> grassBlades;
 Texture2D<float> heightTex;
+Texture2D<float4> normalMapTex;
 
 float4 frustumData[6];
 uint patternSize;
@@ -17,7 +18,7 @@ float swapRange;
 
 // World space positions
 float3 tileStartPosition;
-float4 mapBounds; // Beginning xz, End xz
+float4 mapBounds; // Beginning xy, End zw
 float3 cameraPos;
 static const float3 up = float3(0,1,0);
 
@@ -53,7 +54,7 @@ float rand(float3 p)
 bool isVisible(float3 bladePos)
 {
     // If the blade is off the map, we can return and don't need to loop. This will only happen after clump logic plays out
-    if (bladePos.x < 0 || bladePos.z < 0 || bladePos.x > mapBounds.z || bladePos.z > mapBounds.a) return false;
+    if (bladePos.x < mapBounds.x || bladePos.z < mapBounds.y || bladePos.x > mapBounds.z || bladePos.z > mapBounds.w) return false;
     
     // The way that frustum culling works is if the sphere is outside any plane, then it is not visible
     for (int i = 0; i < 6; i++)
@@ -88,8 +89,8 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float3 worldPos = float3(offsetPos.x, tileStartPosition.y, offsetPos.y);
 
         // Read the terrain heightMap so that we can put each grass blade at the correct elevation
-        uint idX = round(Remap(mapBounds.x, mapBounds.z, 0.0, 1.0, worldPos.x) * 512.0);
-        uint idZ = round(Remap(mapBounds.y, mapBounds.a, 0.0, 1.0, worldPos.z) * 512.0);
+        uint idX = round(Remap(mapBounds.x, mapBounds.z, 0.0, 1.0, worldPos.x) * 511.0);
+        uint idZ = round(Remap(mapBounds.y, mapBounds.w, 0.0, 1.0, worldPos.z) * 511.0);
         float h = heightTex.Load(int3(idX, idZ, 0)) * heightScale;
         worldPos.y = tileStartPosition.y + h;
 
@@ -187,6 +188,12 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
         if (!isVisible(newBladePosition)) continue;
 
+        // Terrain normal calculated so we can reduce antialiasing later
+        float2 mapSize = mapBounds.zw - mapBounds.xy;
+        float2 terrainUV = (newBladePosition.xz - mapBounds.xy) / mapSize;
+        float4 normalData = normalMapTex.SampleLevel(sampler_LinearClamp, terrainUV, 0);
+        float3 terrainNormal = normalData.xyz * 2.0 - 1.0; // [0,1] to [-1,1]
+        blade.terrainNormal = normalize(terrainNormal);
         
         // PART 6:
         // Compute the coefficients for a Bézier curve evaluation

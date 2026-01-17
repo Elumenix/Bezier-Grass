@@ -38,6 +38,7 @@ Shader "Custom/Grass"
         static const half lodTBuffer[8] = { 0.001f, 0.001f, 0.001f, 0.55f, 0.8f, 1.0f, 1.0f, 1.0f };
         static const half arcLODBuffer[4] = { 0.001f, 0.5f, 0.8f, 1.0f };
         StructuredBuffer<GrassBlade> grassBlades; // From the compute shader
+        
         ENDHLSL
         
         Pass
@@ -113,6 +114,9 @@ Shader "Custom/Grass"
                 float3 roundingOffset = widthDir * odd * normalizedWidth * _NormalCurvature;
                 float3 roundedNormal = normalize(GeometricNormalOS + roundingOffset);
 
+                float3 terrainNormalOS = TransformWorldToObject(blade.terrainNormal);
+                float3 roundedTerrainNormal = normalize(terrainNormalOS + roundingOffset);
+
 
                 float3 positionWS = TransformObjectToWorld(pos) + blade.position;
                 float3 bladeDir = float3(-widthDir.z, 0, widthDir.x);
@@ -128,6 +132,7 @@ Shader "Custom/Grass"
                 o.positionWS = positionWS;
                 o.normalWS = normalize(TransformObjectToWorldNormal(roundedNormal));
                 o.vertexID = vertex;
+                o.terrainNormalWS = normalize(TransformObjectToWorldNormal(roundedTerrainNormal));
             }
 
             half4 Fragment(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT_FACE_SEMANTIC) : SV_Target 

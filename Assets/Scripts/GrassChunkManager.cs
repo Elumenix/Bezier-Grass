@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Unity.Collections;
@@ -58,6 +59,7 @@ public class GrassChunkManager : MonoBehaviour
     private static readonly int MapBounds = Shader.PropertyToID("mapBounds");
     private static readonly int CameraPos = Shader.PropertyToID("cameraPos");
     private static readonly int SwapRange = Shader.PropertyToID("swapRange");
+    private static readonly int TerrainNormalMap = Shader.PropertyToID("normalMapTex");
 
     private void Awake()
     {
@@ -98,13 +100,34 @@ public class GrassChunkManager : MonoBehaviour
         };
         lowResIndexBuffer = new GraphicsBuffer(Target.Index, 15, sizeof(uint));
         lowResIndexBuffer.SetData(indicesLOD);
+        
+        CreateTerrainMaps();
+        
+        grassDesc = new GraphicsBuffer(Target.Constant, 1, sizeof(float) * 6);
+        grassDesc.SetData(new [] { grassShape });
+        
+        // This lasts for the life of the program, so it can be set now
+        grassComputeShader.SetConstantBuffer(Shape, grassDesc, 0, 32);
+        
+        InitializeChunks();
+    }
 
+    private void CreateTerrainMaps()
+    {
         // 512x512 heightmap is being interpolated from the default 513x513 one. These values are pretty similar, so it
         // won't look bad and the 512x512 is much better for passing to the gpu.
         float[,] heightData = terrain.terrainData.GetHeights(0, 0, 512, 512);
         
-        // Native array will be used to skip color array packing which would be needed for making texure2ds
+        // Native array will be used to skip color array packing which would be needed for making texture2Ds
         NativeArray<float> heights1D = new NativeArray<float>(512 * 512, Allocator.Temp);
+        NativeArray<Color32> normals1D = new NativeArray<Color32>(512 * 512, Allocator.Temp);
+        
+        // Calculate the actual world-space scale per texel
+        Vector3 terrainScale = terrain.terrainData.size;
+        float texelSizeX = terrainScale.x / 512.0f; // World units per pixel in X
+        float texelSizeY = terrainScale.z / 512.0f; // World units per pixel in Y 
+        float heightScale = terrainScale.y; // Max height of terrain in world units
+        
 
         // Unfortunately, we need to convert this 2D array into a 1D color array to fit it in a Texture2D
         // Parallel For is synchronous, so it should make this much faster than it would otherwise be
@@ -112,8 +135,48 @@ public class GrassChunkManager : MonoBehaviour
         {
             for (int x = 0; x < 512; x++)
             {
+                int index = y * 512 + x;
+                
                 // This is still in the (0-1) range to work as color floats
-                heights1D[y * 512 + x] = heightData[y, x];
+                heights1D[index] = heightData[y, x];
+                
+                // Clamp to map to prevent bugs
+                int xPrev = Mathf.Max(0, x - 1);
+                int xNext = Mathf.Min(511, x + 1);
+                int yPrev = Mathf.Max(0, y - 1);
+                int yNext = Mathf.Min(511, y + 1);
+                
+
+                // Get surrounding height data
+                float tl = heightData[yPrev, xPrev];
+                float t = heightData[yPrev, x];
+                float tr = heightData[yPrev, xNext];
+                float l = heightData[y, xPrev];
+                float r = heightData[y, xNext];
+                float bl = heightData[yNext, xPrev];
+                float b = heightData[yNext, x];
+                float br = heightData[yNext, xNext];
+
+                
+                // sobel filter for smoother normals
+                float dX = (tr + 2 * r + br) - (tl + 2 * l + bl);
+                float dY = (bl + 2 * b + br) - (tl + 2 * t + tr);
+                
+                // make it geometrically accurate, since this will be used for antialiasing
+                float slopeX = (dX * heightScale) / (8.0f * texelSizeX);
+                float slopeY = (dY * heightScale) / (8.0f * texelSizeY);
+                Vector3 normal = new Vector3(-slopeX, 1.0f, -slopeY).normalized;
+                
+                // normals go from [-1,1] to [0,1] range
+                Color normalColor = new Color(
+                    normal.x * 0.5f + 0.5f, 
+                    normal.y * 0.5f + 0.5f, 
+                    normal.z * 0.5f + 0.5f,
+                    1.0f
+                );
+                
+                // Save normal (coverts from Color to Color32 here)
+                normals1D[index] = normalColor;
             }
         });
         
@@ -123,17 +186,16 @@ public class GrassChunkManager : MonoBehaviour
         heightMap.Apply();
         heights1D.Dispose();
         
-        // Send height data to compute shader
+        // Create the normal Texture2D
+        Texture2D normalMap = new Texture2D(512, 512, TextureFormat.RGBA32, true, true); 
+        normalMap.SetPixelData(normals1D, 0);
+        normalMap.Apply();
+        normals1D.Dispose();
+        
+        // Send height data to shaders
         grassComputeShader.SetTexture(0, HeightTex, heightMap);
         grassComputeShader.SetFloat(HeightScale, terrain.terrainData.size.y);
-        
-        grassDesc = new GraphicsBuffer(Target.Constant, 1, sizeof(float) * 6);
-        grassDesc.SetData(new [] { grassShape });
-        
-        // This lasts for the life of the program, so it can be set now
-        grassComputeShader.SetConstantBuffer(Shape, grassDesc, 0, 32);
-        
-        InitializeChunks();
+        grassComputeShader.SetTexture(0, TerrainNormalMap, normalMap);
     }
 
     private void OnApplicationQuit()
