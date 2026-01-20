@@ -218,45 +218,47 @@ float3 ViewSpaceAdjustment(GrassBlade blade, float3 pos, float3 tangentVec)
 half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT_FACE_SEMANTIC)
 {
     // Setting up some data ahead of time
-    float facing = IS_FRONT_VFACE(isFrontFace, 1.0, -1.0);
-    half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
     float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
     Light light = GetMainLight(shadowCoord);
 
     // normalDirWS is the normals for individual blades, which causes a lot of aliasing and not a lot of light-based
     // reflections in the grass if used for everything. It's still needed for back-lighting/subsurface light, but
     // terrain normal is better used for the PBR for a cleaner grass simulation
-    float3 normalDirWS = normalize(input.normalWS) * facing;
-    float3 terrainNormalWS = normalize(input.terrainNormalWS);
+    float facing = IS_FRONT_VFACE(isFrontFace, 1.0, -1.0); // normals for back faces should be reversed
+    half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
+    float3 normalDirWS = normalize(input.normalWS * facing);
+    //float3 terrainNormalWS = normalize(input.terrainNormalWS);
     
     // Set data needed to calculate lighting
     InputData lightData = (InputData)0;
     lightData.positionWS = input.positionWS;
-    lightData.normalWS = terrainNormalWS;
+    lightData.normalWS = normalDirWS;
     lightData.viewDirectionWS = viewDirWS;
     lightData.shadowCoord = shadowCoord;
-    lightData.bakedGI = SampleSH(terrainNormalWS);
+    lightData.bakedGI = SampleSH(normalDirWS);
     lightData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
-    lightData.vertexLighting = VertexLighting(input.positionWS, terrainNormalWS);
+    lightData.vertexLighting = half3(0,0,0);//VertexLighting(input.positionWS, normalDirWS);
                 
     // Surface data is for additional data from textures. 
     SurfaceData surfaceData;
     ZERO_INITIALIZE(SurfaceData, surfaceData);
-    surfaceData.albedo = _Color.rgb * lerp(.7f, 1.0f, input.uv.y); // Top is lighter than the bottom
+    surfaceData.albedo = _Color.rgb;// * lerp(.7f, 1.0f, input.uv.y); // Top is lighter than the bottom
     surfaceData.alpha = 1.0;
-    surfaceData.smoothness = _Glossiness * lerp(.55f, 1.0f, input.uv.y);
+    surfaceData.smoothness = _Glossiness;// * lerp(.55f, 1.0f, input.uv.y);
     surfaceData.metallic = _Metallic;
-    surfaceData.occlusion = _Occlusion * lerp(.5f, 1.0f, input.uv.y);
+    surfaceData.occlusion = _Occlusion;// * lerp(.5f, 1.0f, input.uv.y);
                 
     // Apply PBR Lighting
     half4 pbr = UniversalFragmentPBR(lightData, surfaceData);
-    
+
+
     // Subsurface scattering on back faces, so that the back of grass doesn't look as abnormally dark
     // This isn't really as necessary anymore with terrain normals being used, but it can give the grass more texture
     // especially helpful in higher lighting environments
     half backLight = saturate(dot(-normalDirWS, light.direction)); // 0: towards light, 1: away from light
     half3 translucentLight = backLight * _Translucency * _Color.rgb;
     half3 subSurfaceLight = translucentLight * light.shadowAttenuation * light.distanceAttenuation * light.color;
+    
     return half4(pbr.rgb + subSurfaceLight, pbr.a);
 }
 

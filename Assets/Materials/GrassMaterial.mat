@@ -85,8 +85,8 @@ Material:
     m_Ints: []
     m_Floats:
     - _AddPrecomputedVelocity: 0
-    - _AdjustmentStrength: 0.74
-    - _AdjustmentThreshold: 0.68
+    - _AdjustmentStrength: 0
+    - _AdjustmentThreshold: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
     - _Ambient: 0.306
@@ -110,8 +110,8 @@ Material:
     - _GlossyReflections: 0
     - _GrassLOD: 1
     - _Metallic: 0
-    - _NormalCurvature: 0.2
-    - _Occlusion: 1
+    - _NormalCurvature: 0
+    - _Occlusion: 0.49
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueOffset: 0
@@ -128,10 +128,10 @@ Material:
     - _SubsurfaceWrap: 0.43
     - _Surface: 0
     - _Thickness: 0.1
-    - _Translucency: 0.2
+    - _Translucency: 0.8
     - _ViewAdj: 0
     - _WindAmplitude: 8.1
-    - _WindPower: 2.36
+    - _WindPower: 1.5
     - _WindScale: 0.063
     - _WindSpeed: 1.05
     - _WorkflowMode: 1
