@@ -395,8 +395,8 @@ public class GrassChunkManager : MonoBehaviour
 public struct GrassShape
 {
     [Range(0,10)] public float grassLength;
-    [Range(0,1)] public float tilt;
-    [Range(0,1)] public float bend;
+    [Range(0,3)] public float tilt;
+    [Range(-2,2)] public float bend;
     [Range(0,5)] public float lengthVariance;
     [Range(0,.5f)] public float tiltVariance;
     [Range(0,.5f)] public float bendVariance;

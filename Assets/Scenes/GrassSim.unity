@@ -383,8 +383,8 @@ MonoBehaviour:
   swapRange: 115
   grassShapeRange:
     grassLength: 2.74
-    tilt: 0.631
-    bend: 0.522
+    tilt: 1.36
+    bend: -2
     lengthVariance: 1
     tiltVariance: 0.146
     bendVariance: 0.111

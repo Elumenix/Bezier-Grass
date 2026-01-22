@@ -56,6 +56,19 @@ float _AdjustmentStrength;
 float _NormalCurvature;
 float _Translucency;
 
+// Helper function
+// If you're wondering why the name of this is different here than in the compute shader and C# version, it's because
+// the name was silently conflicting with a background function and crashing the program
+float2 RotateVec2D(float2 v, float angle)
+{
+    float c = cos(angle);
+    float s = sin(angle);
+    return float2(
+        v.x * c - v.y * s,
+        v.x * s + v.y * c
+    );
+}
+
 /// Essentially copying part of the compute shader code to make a grassblade. This should only be used for testing
 GrassBlade CreateGrassBlade(TestGrassBlade blade)
 {
@@ -64,22 +77,29 @@ GrassBlade CreateGrassBlade(TestGrassBlade blade)
     newBlade.position = blade.position;
     newBlade.dimensions = float2(blade.width, blade.tilt);
     newBlade.hash = .34982983f; // Doesn't matter in testing really
+    newBlade.terrainNormal = float3(0,0,0); // Doesn't matter in testing
 
     
     float3 up = float3(0,1,0);
     float3 widthDir = float3(blade.facing.y, 0, -blade.facing.x); // Orthogonal normal to facing
+    float3 forwardDir = float3(blade.facing.x, 0, blade.facing.y); 
     
     float3 p0 = float3(0,0,0); // Root of the grass blade in object space.
-    float3 p1 = p0 + up * (blade.height * blade.bend); // Above the starting point. Controls how rigid the base is.
-    float3 p3 = p0 + float3(blade.facing.x, 0, blade.facing.y) * blade.tilt + up * blade.height; // Endpoint is based on height and tilt.
 
-    float3 diff = p3 - p0;
-    float3 midPoint = 0.5f * diff;
-    float3 bladeDir = normalize(diff);
-    float3 awayDir = normalize(cross(-widthDir, bladeDir));
+    float radius = blade.height / blade.bend;
+    float k = (4.0f / 3.0f) * tan(blade.bend / 4.0f);
 
-    // Towards the middle and away from the blade. Predominantly controls how bent the blade is
-    float3 p2 = p0 + midPoint + awayDir * blade.bend;
+    float2 P3_2D = float2(radius * sin(blade.bend), radius * (1.0f - cos(blade.bend)));
+    float2 P1_2D = k * radius * float2(1.0f, 0);
+    float2 P2_2D = P3_2D - k * radius * float2(cos(blade.bend), sin(blade.bend));
+
+    P1_2D = RotateVec2D(P1_2D, blade.tilt);
+    P2_2D = RotateVec2D(P2_2D, blade.tilt);
+    P3_2D = RotateVec2D(P3_2D, blade.tilt);
+        
+    float3 p1 = P1_2D.x * forwardDir + P1_2D.y * up;
+    float3 p2 = P2_2D.x * forwardDir + P2_2D.y * up;
+    float3 p3 = P3_2D.x * forwardDir + P3_2D.y * up;
     
     float3 c0 = p0;                        // Offset
     float3 c1 = 3 * (p1 - p0);             // t

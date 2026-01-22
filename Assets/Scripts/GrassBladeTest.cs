@@ -174,18 +174,7 @@ public class GrassBladeTest : MonoBehaviour
         tilt = bladeHash2D.y;
         facing = normalize(bladeHash2D * 2.0f - Vector2.one); // Random values between 0 and 1
 
-        // Endpoint is based on height and tilt
-        p3.transform.position = p0.transform.position + new Vector3(facing.x, 0, facing.y) * tilt + Vector3.up * height;
-        
-        // Above the starting point. How long until bending starts a lot more
-        p1.transform.position = p0.transform.position + Vector3.up * (height * bend);
-
-        Vector3 midPoint = 0.5f * (p3.transform.position - p0.transform.position);
-        Vector3 widthDir = new Vector3(facing.y, 0, -facing.x);
-        Vector3 bladeDir = normalize(p3.transform.position - p0.transform.position);
-        Vector3 awayDir = cross(-widthDir, bladeDir);
-
-        p2.transform.position = (p0.transform.position + midPoint) + awayDir * bend;
+        UpdatePoints();
     }
 
     // Doesn't move bend, tilt, height, facing
@@ -193,7 +182,30 @@ public class GrassBladeTest : MonoBehaviour
     {
         facing = normalize(facing);
         p0.transform.position = Vector2.zero;
+        
+        
+        float radius = height / bend;
+        float k = (4.0f / 3.0f) * tan(bend / 4.0f);
+        float3 up = Vector3.up;
+        float3 forwardDir = float3(facing.x, 0, facing.y); 
 
+        float2 P3_2D = float2(radius * sin(bend), radius * (1.0f - cos(bend)));
+        float2 P1_2D = k * radius * float2(1.0f, 0);
+        float2 P2_2D = P3_2D - k * radius * float2(cos(bend), sin(bend));
+
+        P1_2D = Rotate2D(P1_2D, tilt);
+        P2_2D = Rotate2D(P2_2D, tilt);
+        P3_2D = Rotate2D(P3_2D, tilt);
+        
+        float3 localP1 = P1_2D.x * forwardDir + P1_2D.y * up;
+        float3 localP2 = P2_2D.x * forwardDir + P2_2D.y * up;
+        float3 localP3 = P3_2D.x * forwardDir + P3_2D.y * up;
+
+        p1.transform.position = localP1;
+        p2.transform.position = localP2;
+        p3.transform.position = localP3;
+        
+        /*
         // Endpoint is based on height and tilt
         p3.transform.position = p0.transform.position + new Vector3(facing.x, 0, facing.y) * tilt + Vector3.up * height;
         
@@ -205,7 +217,17 @@ public class GrassBladeTest : MonoBehaviour
         Vector3 bladeDir = normalize(p3.transform.position - p0.transform.position);
         Vector3 awayDir = cross(-widthDir, bladeDir);
 
-        p2.transform.position = (p0.transform.position + midPoint) + awayDir * bend;
+        p2.transform.position = (p0.transform.position + midPoint) + awayDir * bend;*/
+    }
+    
+    float2 Rotate2D(float2 v, float angle)
+    {
+        float c = cos(angle);
+        float s = sin(angle);
+        return float2(
+            v.x * c - v.y * s,
+            v.x * s + v.y * c
+        );
     }
 
     /*private void OnDrawGizmos()

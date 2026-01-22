@@ -137,6 +137,12 @@ Shader "Custom/Grass"
 
             half4 Fragment(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT_FACE_SEMANTIC) : SV_Target 
             {
+                /*
+                float facing = IS_FRONT_VFACE(isFrontFace, 1.0, -1.0); // normals for back faces should be reversed
+                float3 normals = (input.normalWS * facing + 1) * 0.5; 
+                return half4(normals, 1);
+                */
+                
                 half4 pbr = CalculateGrassLighting(input, isFrontFace);
                 return pbr;
             }

@@ -67,6 +67,16 @@ bool isVisible(float3 bladePos)
     return true;
 }
 
+float2 Rotate2D(float2 v, float angle)
+{
+    float c = cos(angle);
+    float s = sin(angle);
+    return float2(
+        v.x * c - v.y * s,
+        v.x * s + v.y * c
+    );
+}
+
 [numthreads(8,1,8)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
@@ -157,15 +167,39 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float2 facing2D = normalize(rand2(worldPos.xz) * 2.0f - 1); // Between -1 and 1
         float2 facing = normalize(lerp(facing2D, clumpFacing, clumpDirection)); // Turns by clump direction parameter
         float3 widthDir = float3(facing.y, 0, -facing.x); // Orthogonal normal to facing
-        
+        float3 forwardDir = float3(facing.x, 0, facing.y); 
+
+        // TODO: Add back the clamps once I determine the proper shape of the blades
         float bladeLength = clamp(grassLength + (rand(worldPos.xxz) * 2 - 1) * lengthVariance, .01f, 10.0f);
-        float bladeTilt = clamp(tilt + (rand(worldPos.zxx) * 2 - 1) * tiltVariance, .01f, .99f);
-        float bladeBend = clamp(bend + (rand(worldPos.xzx) * 2 - 1) * bendVariance, 0.0f, 2.0f);
+        float bladeTilt = /*clamp(*/tilt + (rand(worldPos.zxx) * 2 - 1) * tiltVariance/*, .01f, .99f)*/;
+        float bladeBend = /*clamp(*/bend + (rand(worldPos.xzx) * 2 - 1) * bendVariance/*, 0.0f, 2.0f)*/;
         
         // PART 4:
         // Get the four control points of the Cubic Bézier Curve that will determine the blades shape
         float3 p0 = float3(0,0,0); // Root of the grass blade in object space.
-        float p3y = bladeTilt * bladeLength;
+
+        // Bézier curves are being based off of circular curves because they have a closed form solution for arc-length
+        // This makes it so that I can prevent blades from having different texture resolutions and deforming in wind weirdly
+        float radius = bladeLength / bladeBend;
+        float k = (4.0f / 3.0f) * tan(bladeBend / 4.0f);
+
+        // Shape of the blade is determined in 2D, tracing along the radius of a sphere
+        float2 P3_2D = float2(radius * sin(bladeBend), radius * (1.0f - cos(bladeBend)));
+        float2 P1_2D = k * radius * float2(1.0f, 0);
+        float2 P2_2D = P3_2D - k * radius * float2(cos(bladeBend), sin(bladeBend));
+
+        // How tilted should the curve be relative to the origin
+        P1_2D = Rotate2D(P1_2D, bladeTilt);
+        P2_2D = Rotate2D(P2_2D, bladeTilt);
+        P3_2D = Rotate2D(P3_2D, bladeTilt);
+
+        // Bringing the curve into 3D space
+        float3 p1 = P1_2D.x * forwardDir + P1_2D.y * up;
+        float3 p2 = P2_2D.x * forwardDir + P2_2D.y * up;
+        float3 p3 = P3_2D.x * forwardDir + P3_2D.y * up;
+
+        // Bézier curve math when we weren't using arcs for a better curve
+        /*float p3y = bladeTilt * bladeLength;
         float p3x = sqrt(bladeLength * bladeLength - p3y * p3y);
         float3 p3 = float3(p3x * facing.x, p3y, p3x * facing.y); // Tip of the blade. Rotated to point in facing direction
         
@@ -174,7 +208,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
         // Towards the middle and away from the blade. Predominantly controls how bent the blade is
         float3 p1 = p3 * .33f + awayDir * bladeBend * .5f;
-        float3 p2 = p3 * .66f + awayDir * bladeBend * .75f;
+        float3 p2 = p3 * .66f + awayDir * bladeBend * .75f;*/
         
         // PART 5:
         // Put together the struct for the blade and make sure it is visible
