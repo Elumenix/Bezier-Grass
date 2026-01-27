@@ -60,6 +60,9 @@ public class GrassChunkManager : MonoBehaviour
     private static readonly int CameraPos = Shader.PropertyToID("cameraPos");
     private static readonly int SwapRange = Shader.PropertyToID("swapRange");
     private static readonly int TerrainNormalMap = Shader.PropertyToID("normalMapTex");
+    private static readonly int WindScale = Shader.PropertyToID("_WindScale");
+    private static readonly int WindSpeed = Shader.PropertyToID("_WindSpeed");
+    private static readonly int WindPower = Shader.PropertyToID("_WindPower");
 
     private void Awake()
     {
@@ -364,6 +367,9 @@ public class GrassChunkManager : MonoBehaviour
         }
         
         grassComputeShader.SetFloats(FrustumData, frustumData);
+        grassComputeShader.SetFloat(WindScale, grassMat.GetFloat(WindScale));
+        grassComputeShader.SetFloat(WindSpeed, grassMat.GetFloat(WindSpeed));
+        grassComputeShader.SetFloat(WindPower, grassMat.GetFloat(WindPower));
         Vector3 cameraPos = useSceneCamera ? SceneView.lastActiveSceneView.camera.transform.position : mainCamera.transform.position;
         grassComputeShader.SetVector(CameraPos, cameraPos);
         
@@ -395,8 +401,8 @@ public class GrassChunkManager : MonoBehaviour
 public struct GrassShape
 {
     [Range(0,10)] public float grassLength;
-    [Range(0,3)] public float tilt;
-    [Range(-2,2)] public float bend;
+    [Range(0,1.57f)] public float tilt;
+    [Range(0.001f,2.5f)] public float bend;
     [Range(0,5)] public float lengthVariance;
     [Range(0,.5f)] public float tiltVariance;
     [Range(0,.5f)] public float bendVariance;

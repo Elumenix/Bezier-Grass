@@ -262,9 +262,9 @@ half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT
     // Surface data is for additional data from textures. 
     SurfaceData surfaceData;
     ZERO_INITIALIZE(SurfaceData, surfaceData);
-    surfaceData.albedo = _Color.rgb;// * lerp(.7f, 1.0f, input.uv.y); // Top is lighter than the bottom
+    surfaceData.albedo = _Color.rgb * lerp(.7f, 1.0f, input.uv.y); // Top is lighter than the bottom
     surfaceData.alpha = 1.0;
-    surfaceData.smoothness = _Glossiness;// * lerp(.55f, 1.0f, input.uv.y);
+    surfaceData.smoothness = _Glossiness * lerp(.55f, 1.0f, input.uv.y);
     surfaceData.metallic = _Metallic;
     surfaceData.occlusion = _Occlusion;// * lerp(.5f, 1.0f, input.uv.y);
                 

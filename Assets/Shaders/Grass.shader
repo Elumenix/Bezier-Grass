@@ -16,7 +16,7 @@ Shader "Custom/Grass"
         
         [Header(Blade Behavior)]
         _WindScale ("Wind Scale", Range(0.0, .25)) = .1
-        _WindPower ("Wind Power", Range(0.0, 10)) = .75
+        _WindPower ("Wind Power", Range(0.0, 1.5)) = .75
         _WindSpeed ("Wind Speed", Range(0.0, 5.0)) = 1.5
         _LodRange ("LOD Range", Vector) = (200, 500, 0, 0)
     }
@@ -98,7 +98,7 @@ Shader "Custom/Grass"
                 float3 pos;
                 float3 tangentVec;
                 CalculateBezierCurve(blade, t, pos, tangentVec);
-                CalculateWindDisplacement(blade, t, pos, tangentVec);
+                //CalculateWindDisplacement(blade, t, pos, tangentVec);
                 tangentVec = normalize(tangentVec); // Was unnormalized to this point because it simplified math in wind displacement
             
                 // Blade will get skinnier the further up it goes, with the last one being along the center

@@ -173,6 +173,31 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float bladeLength = clamp(grassLength + (rand(worldPos.xxz) * 2 - 1) * lengthVariance, .01f, 10.0f);
         float bladeTilt = /*clamp(*/tilt + (rand(worldPos.zxx) * 2 - 1) * tiltVariance/*, .01f, .99f)*/;
         float bladeBend = /*clamp(*/bend + (rand(worldPos.xzx) * 2 - 1) * bendVariance/*, 0.0f, 2.0f)*/;
+
+
+
+        if (_WindPower > 0 && _WindSpeed > 0)
+        {
+            // Per-blade random value (consistent for each blade based on its position)
+            float bladeRandom = frac(sin(dot(worldPos.xz, float2(12.9898, 78.233))) * 43758.5453);
+            float windStrength = _WindPower * lerp(0.70, 1.5, bladeRandom); // Each blade 70% to 150% responsive
+    
+
+
+            float n1 = perlin(worldPos.xz * _WindScale * 0.5 + _Time.y * _WindSpeed * 0.2);
+            float n2 = perlin(worldPos.xz * _WindScale * 1.0 + _Time.y * _WindSpeed * 0.6);
+            float n3 = perlin(worldPos.xz * _WindScale * 2.5 + _Time.y * _WindSpeed * 1.8);
+
+            float wind = (n1 * 2 - 1) * 0.6 + (n2 * 2 - 1) * 0.3 + (n3 * 2 - 1) * 0.1;
+            wind *= windStrength;
+
+
+
+
+            bladeTilt = bladeTilt + wind * 0.5;
+            bladeBend = bladeBend + ((n2 * 0.5 + n3 * 1.0) * 2 - 1) * windStrength;
+        }
+        
         
         // PART 4:
         // Get the four control points of the Cubic Bézier Curve that will determine the blades shape
@@ -184,9 +209,9 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float k = (4.0f / 3.0f) * tan(bladeBend / 4.0f);
 
         // Shape of the blade is determined in 2D, tracing along the radius of a sphere
-        float2 P3_2D = float2(radius * sin(bladeBend), radius * (1.0f - cos(bladeBend)));
+        float2 P3_2D = float2(radius * sin(bladeBend), -radius * (1.0f - cos(bladeBend)));
         float2 P1_2D = k * radius * float2(1.0f, 0);
-        float2 P2_2D = P3_2D - k * radius * float2(cos(bladeBend), sin(bladeBend));
+        float2 P2_2D = P3_2D - k * radius * float2(cos(bladeBend), -sin(bladeBend));
 
         // How tilted should the curve be relative to the origin
         P1_2D = Rotate2D(P1_2D, bladeTilt);
