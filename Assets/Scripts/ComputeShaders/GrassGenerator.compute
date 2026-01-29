@@ -220,7 +220,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         newBladePosition.xz = lerp(worldPos.xz, voronoiCell, clumpSeparation);
         blade.position = newBladePosition;
         blade.hash = rand(worldPos.zyx);
-        blade.dimensions = float2(-.15f, bladeLength); // Tilt is the length (Which most closely follows arcLength)
+        blade.dimensions = float2(-.2f, bladeLength); // Tilt is the length (Which most closely follows arcLength)
         blade.widthDir = widthDir;
 
         if (!isVisible(newBladePosition)) continue;
