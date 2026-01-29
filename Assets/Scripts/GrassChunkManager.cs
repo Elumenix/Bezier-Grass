@@ -400,9 +400,9 @@ public class GrassChunkManager : MonoBehaviour
 [StructLayout(LayoutKind.Sequential, Pack = 32)]
 public struct GrassShape
 {
-    [Range(0,10)] public float grassLength;
-    [Range(0,1.57f)] public float tilt;
-    [Range(0.001f,2.5f)] public float bend;
+    [Range(0,5)] public float grassLength;
+    [Range(0,1)] public float tilt;
+    [Range(0,3f)] public float bend;
     [Range(0,5)] public float lengthVariance;
     [Range(0,.5f)] public float tiltVariance;
     [Range(0,.5f)] public float bendVariance;

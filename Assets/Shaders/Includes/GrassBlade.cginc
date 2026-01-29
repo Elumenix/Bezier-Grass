@@ -257,7 +257,7 @@ half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT
     lightData.shadowCoord = shadowCoord;
     lightData.bakedGI = SampleSH(normalDirWS);
     lightData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
-    lightData.vertexLighting = half3(0,0,0);//VertexLighting(input.positionWS, normalDirWS);
+    lightData.vertexLighting = VertexLighting(input.positionWS, normalDirWS);
                 
     // Surface data is for additional data from textures. 
     SurfaceData surfaceData;
@@ -266,7 +266,7 @@ half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT
     surfaceData.alpha = 1.0;
     surfaceData.smoothness = _Glossiness * lerp(.55f, 1.0f, input.uv.y);
     surfaceData.metallic = _Metallic;
-    surfaceData.occlusion = _Occlusion;// * lerp(.5f, 1.0f, input.uv.y);
+    surfaceData.occlusion = _Occlusion * lerp(.5f, 1.0f, input.uv.y);
                 
     // Apply PBR Lighting
     half4 pbr = UniversalFragmentPBR(lightData, surfaceData);

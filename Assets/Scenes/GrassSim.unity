@@ -382,12 +382,12 @@ MonoBehaviour:
   chunksPerSide: 16
   swapRange: 115
   grassShapeRange:
-    grassLength: 2.74
-    tilt: 1.36
-    bend: 1.33
-    lengthVariance: 1
-    tiltVariance: 0.073
-    bendVariance: 0.111
+    grassLength: 2.6
+    tilt: 0.43
+    bend: 1.8
+    lengthVariance: 1.27
+    tiltVariance: 0.153
+    bendVariance: 0.253
   patternSize: 50
   scale: 5
   clumpSeparation: 0
