@@ -122,7 +122,7 @@ Material:
     - _Glossiness: 0.433
     - _GlossyReflections: 0
     - _Metallic: 0
-    - _NormalCurvature: 0.772
+    - _NormalCurvature: 0
     - _NumPoints: 10
     - _Occlusion: 1
     - _OcclusionStrength: 1

@@ -103,7 +103,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // Early out if the blade wouldn't be visible. Don't add it to the appendBuffer because it shouldn't be rendered
         // This also takes some of the write contention away from the buffer for this chunks shader call
         // Less blades are drawn in the distance because the user won't necessarily be able to see them anymore
-        if (dist > swapRange + i * swapRange || !isVisible(worldPos)) continue;
+        if (dist > swapRange + i * swapRange) continue;
 
 
         // PART 2:
@@ -162,6 +162,9 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         uint idZ = round(Remap(mapBounds.y, mapBounds.w, 0.0, 1.0, worldPos.z) * 511.0);
         float h = heightTex.Load(int3(idX, idZ, 0)) * heightScale;
         worldPos.y = tileStartPosition.y + h;
+
+        // Last chance to make sure that blades outside the camera view don't need to be rendered
+        if (!isVisible(worldPos)) continue;
 
 
         // PART 3:
@@ -226,8 +229,6 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         blade.hash = rand(worldPos.zyx);
         blade.dimensions = float2(-.2f, bladeLength); // Tilt is the length (Which most closely follows arcLength)
         blade.widthDir = widthDir;
-
-        if (!isVisible(worldPos)) continue;
 
         // Terrain normal calculated so we can reduce antialiasing later
         float2 mapSize = mapBounds.zw - mapBounds.xy;
