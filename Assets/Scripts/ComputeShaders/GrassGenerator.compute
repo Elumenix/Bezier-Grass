@@ -98,12 +98,6 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float2 offsetPos = gridPos + rand2(gridPos * float2(3.25f, 9.91563f)) * grassDist; // Jitter point within quadrant 
         float3 worldPos = float3(offsetPos.x, tileStartPosition.y, offsetPos.y);
 
-        // Read the terrain heightMap so that we can put each grass blade at the correct elevation
-        uint idX = round(Remap(mapBounds.x, mapBounds.z, 0.0, 1.0, worldPos.x) * 511.0);
-        uint idZ = round(Remap(mapBounds.y, mapBounds.w, 0.0, 1.0, worldPos.z) * 511.0);
-        float h = heightTex.Load(int3(idX, idZ, 0)) * heightScale;
-        worldPos.y = tileStartPosition.y + h;
-
         float dist = distance(cameraPos, worldPos);
 
         // Early out if the blade wouldn't be visible. Don't add it to the appendBuffer because it shouldn't be rendered
@@ -160,6 +154,15 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // puts cell position into worldSpace
         float2 voronoiCell = closestCellPos * scale;
 
+        // Modify position based on how clumped blades should be
+        worldPos.xz = lerp(worldPos.xz, voronoiCell, clumpSeparation);
+
+        // Read the terrain heightMap so that we can put each grass blade at the correct elevation
+        uint idX = round(Remap(mapBounds.x, mapBounds.z, 0.0, 1.0, worldPos.x) * 511.0);
+        uint idZ = round(Remap(mapBounds.y, mapBounds.w, 0.0, 1.0, worldPos.z) * 511.0);
+        float h = heightTex.Load(int3(idX, idZ, 0)) * heightScale;
+        worldPos.y = tileStartPosition.y + h;
+
 
         // PART 3:
         // The position and voronoi will be used to generate random values that will be used to shape each grass blade
@@ -168,7 +171,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float2 facing = normalize(lerp(facing2D, clumpFacing, clumpDirection)); // Turns by clump direction parameter
         float3 widthDir = float3(facing.y, 0, -facing.x); // Orthogonal normal to facing
 
-        float bladeLength = clamp(grassLength + (rand(worldPos.xxz) * 2 - 1) * lengthVariance, .01f, 10.0f);
+        float bladeLength = clamp(grassLength + (rand(worldPos.xzz) * 2 - 1) * lengthVariance, .01f, 10.0f);
         float bladeTilt = clamp(tilt + (rand(worldPos.zxx) * 2 - 1) * tiltVariance, 0.0f, 1.0f);
         float bladeBend = clamp(bend + (rand(worldPos.xzx) * 2 - 1) * bendVariance, 0.0f, 3.0f);
 
@@ -176,14 +179,17 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
         if (_WindPower > 0 && _WindSpeed > 0)
         {
+            float windAngle = DegToRad(_WindDirection);
+            float2 windFacing = float2(cos(windAngle), sin(windAngle));
+            
             // Per-blade random value (consistent for each blade based on its position)
             float bladeRandom = frac(sin(dot(worldPos.xz, float2(12.9898, 78.233))) * 43758.5453);
             float windStrength = _WindPower * lerp(0.70, 1.5, bladeRandom); // Each blade 70% to 150% responsive
 
 
-            float n1 = perlin(worldPos.xz * _WindScale * 0.5 + _Time.y * _WindSpeed * 0.2);
-            float n2 = perlin(worldPos.xz * _WindScale * 1.0 + _Time.y * _WindSpeed * 1);
-            float n3 = perlin(worldPos.xz * _WindScale * 2.5 + _Time.y * _WindSpeed * 1.8);
+            float n1 = perlin(worldPos.xz * _WindScale * 0.5 + _Time.y * _WindSpeed * 0.2 * windFacing);
+            float n2 = perlin(worldPos.xz * _WindScale * 1.0 + _Time.y * _WindSpeed * 1 * windFacing);
+            float n3 = perlin(worldPos.xz * _WindScale * 2.5 + _Time.y * _WindSpeed * 1.8 * windFacing);
             
             
             bladeTilt = clamp(bladeTilt + n1 * windStrength * .25, 0, .9);
@@ -216,18 +222,16 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // PART 5:
         // Put together the struct for the blade and make sure it is visible
         GrassBlade blade;
-        float3 newBladePosition = worldPos;
-        newBladePosition.xz = lerp(worldPos.xz, voronoiCell, clumpSeparation);
-        blade.position = newBladePosition;
+        blade.position = worldPos;
         blade.hash = rand(worldPos.zyx);
         blade.dimensions = float2(-.2f, bladeLength); // Tilt is the length (Which most closely follows arcLength)
         blade.widthDir = widthDir;
 
-        if (!isVisible(newBladePosition)) continue;
+        if (!isVisible(worldPos)) continue;
 
         // Terrain normal calculated so we can reduce antialiasing later
         float2 mapSize = mapBounds.zw - mapBounds.xy;
-        float2 terrainUV = (newBladePosition.xz - mapBounds.xy) / mapSize;
+        float2 terrainUV = (worldPos.xz - mapBounds.xy) / mapSize;
         float4 normalData = normalMapTex.SampleLevel(sampler_LinearClamp, terrainUV, 0);
         float3 terrainNormal = normalData.xyz * 2.0 - 1.0; // [0,1] to [-1,1]
         blade.terrainNormal = normalize(terrainNormal);

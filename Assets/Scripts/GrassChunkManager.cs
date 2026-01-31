@@ -63,6 +63,7 @@ public class GrassChunkManager : MonoBehaviour
     private static readonly int WindScale = Shader.PropertyToID("_WindScale");
     private static readonly int WindSpeed = Shader.PropertyToID("_WindSpeed");
     private static readonly int WindPower = Shader.PropertyToID("_WindPower");
+    private static readonly int WindDirection = Shader.PropertyToID("_WindDirection");
 
     private void Awake()
     {
@@ -367,6 +368,7 @@ public class GrassChunkManager : MonoBehaviour
         }
         
         grassComputeShader.SetFloats(FrustumData, frustumData);
+        grassComputeShader.SetFloat(WindDirection, grassMat.GetFloat(WindDirection));
         grassComputeShader.SetFloat(WindScale, grassMat.GetFloat(WindScale));
         grassComputeShader.SetFloat(WindSpeed, grassMat.GetFloat(WindSpeed));
         grassComputeShader.SetFloat(WindPower, grassMat.GetFloat(WindPower));

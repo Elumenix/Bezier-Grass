@@ -7,7 +7,7 @@ Shader "Custom/Grass"
         _Glossiness ("Smoothness", Range(0,1.0)) = 0.5
         _Metallic ("Metallic", Range(0,1.0)) = 0.0
         _Occlusion ("Occlusion", Range(0,1.0)) = 1.0
-        _Translucency ("Translucency", Range(0.0, 1.0)) = 0.3
+        _TerrainNormalAdjustment ("Adjustment Towards Terrain Normal", Range(0,1.0)) = 0.0
         _NormalCurvature ("Normal Curve", Range(0.0, 1.0)) = 0.5
         
         [Header(Camera View Space Projection Settings)]
@@ -15,9 +15,10 @@ Shader "Custom/Grass"
         _AdjustmentStrength ("Adjustment Strength", Range(0.0,1.0)) = 0.75
         
         [Header(Blade Behavior)]
+        _WindDirection ("Wind Direction", Range(0.0, 360.0)) = 72.5
         _WindScale ("Wind Scale", Range(0.0, .25)) = .1
-        _WindPower ("Wind Power", Range(0.0, 1.5)) = .75
-        _WindSpeed ("Wind Speed", Range(0.0, 5.0)) = 1.5
+        _WindPower ("Wind Power", Range(0.0, 3)) = .75
+        _WindSpeed ("Wind Speed", Range(0.0, 10.0)) = 1.5
         _LodRange ("LOD Range", Vector) = (200, 500, 0, 0)
     }
     SubShader
@@ -111,7 +112,7 @@ Shader "Custom/Grass"
                 // Normals are rounded so that the blades don't look as flat and reflect light better
                 float3 GeometricNormalOS = cross(tangentVec, widthDir);
                 float normalizedWidth = sideOffset / blade.dimensions.x;
-                float3 roundingOffset = widthDir * odd * normalizedWidth * _NormalCurvature;
+                float3 roundingOffset = widthDir * -odd * normalizedWidth * _NormalCurvature;
                 float3 roundedNormal = normalize(GeometricNormalOS + roundingOffset);
 
                 float3 terrainNormalOS = TransformWorldToObject(blade.terrainNormal);
@@ -137,11 +138,11 @@ Shader "Custom/Grass"
 
             half4 Fragment(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT_FACE_SEMANTIC) : SV_Target 
             {
-                /*
-                float facing = IS_FRONT_VFACE(isFrontFace, 1.0, -1.0); // normals for back faces should be reversed
+                
+                /*float facing = IS_FRONT_VFACE(isFrontFace, 1.0, -1.0); // normals for back faces should be reversed
                 float3 normals = (input.normalWS * facing + 1) * 0.5; 
-                return half4(normals, 1);
-                */
+                return half4(normals, 1);*/
+                
                 
                 half4 pbr = CalculateGrassLighting(input, isFrontFace);
                 return pbr;

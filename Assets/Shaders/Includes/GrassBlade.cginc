@@ -46,15 +46,15 @@ half _Glossiness;
 half _Metallic;
 half _Occlusion;
 half _ViewAdj;
+half _WindDirection;
 half _WindScale;
 half _WindPower;
-half _WindAmplitude;
 half _WindSpeed;
 float2 _LodRange;
 float _AdjustmentThreshold;
 float _AdjustmentStrength;
 float _NormalCurvature;
-float _Translucency;
+float _TerrainNormalAdjustment;
 
 // Helper function
 // If you're wondering why the name of this is different here than in the compute shader and C# version, it's because
@@ -165,6 +165,9 @@ void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 
     tangentVec = derivative;
 }
 
+// This is Deprecated currently and is now happening in the compute shader, where direct values of the grass shape
+// are altered rather than the vertices. This saves us from some weird looking blades and also makes it so that
+// we don't need to recalculate an estimate for the tangent.
 void CalculateWindDisplacement(GrassBlade blade, float t, in out float3 pos, in out float3 tangentVec)
 {
     // PART 1
@@ -239,25 +242,31 @@ half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT
 {
     // Setting up some data ahead of time
     float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
-    Light light = GetMainLight(shadowCoord);
+    float facing = IS_FRONT_VFACE(isFrontFace, 1.0, -1.0); // Allows reversing normals of back faces
 
     // normalDirWS is the normals for individual blades, which causes a lot of aliasing and not a lot of light-based
-    // reflections in the grass if used for everything. It's still needed for back-lighting/subsurface light, but
     // terrain normal is better used for the PBR for a cleaner grass simulation
-    float facing = IS_FRONT_VFACE(isFrontFace, 1.0, -1.0); // normals for back faces should be reversed
     half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
-    float3 normalDirWS = normalize(input.normalWS * facing);
-    //float3 terrainNormalWS = normalize(input.terrainNormalWS);
+    float3 normalDirWS = normalize(input.normalWS * facing); // Normals reversed to differentiate front and back
+    float3 terrainNormalWS = normalize(input.terrainNormalWS); // Terrain Normal use looks better when blades are more uniform
+    float3 finalNormal = normalize((1 -_TerrainNormalAdjustment) * normalDirWS + terrainNormalWS * _TerrainNormalAdjustment);
+
+
+    // For bakedGI specifically, the terrain normal is going to be used for all back faces. PBR has a bit of trouble with
+    // backface lighting, and it looks better to use the more consistent value for it in both cases
+    float3 ambientNormal = IS_FRONT_VFACE(isFrontFace, finalNormal, terrainNormalWS);
+    IS_FRONT_VFACE(isFrontFace, finalNormal, terrainNormalWS);
+    
     
     // Set data needed to calculate lighting
     InputData lightData = (InputData)0;
     lightData.positionWS = input.positionWS;
-    lightData.normalWS = normalDirWS;
+    lightData.normalWS = finalNormal;
     lightData.viewDirectionWS = viewDirWS;
     lightData.shadowCoord = shadowCoord;
-    lightData.bakedGI = SampleSH(normalDirWS);
+    lightData.bakedGI = SampleSH(ambientNormal);
     lightData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
-    lightData.vertexLighting = VertexLighting(input.positionWS, normalDirWS);
+    lightData.vertexLighting = VertexLighting(input.positionWS, finalNormal);
                 
     // Surface data is for additional data from textures. 
     SurfaceData surfaceData;
@@ -270,16 +279,7 @@ half4 CalculateGrassLighting(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT
                 
     // Apply PBR Lighting
     half4 pbr = UniversalFragmentPBR(lightData, surfaceData);
-
-
-    // Subsurface scattering on back faces, so that the back of grass doesn't look as abnormally dark
-    // This isn't really as necessary anymore with terrain normals being used, but it can give the grass more texture
-    // especially helpful in higher lighting environments
-    half backLight = saturate(dot(-normalDirWS, light.direction)); // 0: towards light, 1: away from light
-    half3 translucentLight = backLight * _Translucency * _Color.rgb;
-    half3 subSurfaceLight = translucentLight * light.shadowAttenuation * light.distanceAttenuation * light.color;
-    
-    return half4(pbr.rgb + subSurfaceLight, pbr.a);
+    return pbr;
 }
 
 #endif
