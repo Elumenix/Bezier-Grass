@@ -64,6 +64,7 @@ public class GrassChunkManager : MonoBehaviour
     private static readonly int WindSpeed = Shader.PropertyToID("_WindSpeed");
     private static readonly int WindPower = Shader.PropertyToID("_WindPower");
     private static readonly int WindDirection = Shader.PropertyToID("_WindDirection");
+    private static readonly int AlphaMapTex = Shader.PropertyToID("alphaMapTex");
 
     private void Awake()
     {
@@ -196,10 +197,14 @@ public class GrassChunkManager : MonoBehaviour
         normalMap.Apply();
         normals1D.Dispose();
         
+        // Will track where layer 0 (grass layer) is used, so I can make grass spawn only on the grass layer
+        Texture2D alphaMap = terrain.terrainData.GetAlphamapTexture(0);
+        
         // Send height data to shaders
         grassComputeShader.SetTexture(0, HeightTex, heightMap);
         grassComputeShader.SetFloat(HeightScale, terrain.terrainData.size.y);
         grassComputeShader.SetTexture(0, TerrainNormalMap, normalMap);
+        grassComputeShader.SetTexture(0, AlphaMapTex, alphaMap);
     }
 
     private void OnApplicationQuit()

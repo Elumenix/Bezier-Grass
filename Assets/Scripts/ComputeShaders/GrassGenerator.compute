@@ -6,6 +6,7 @@
 AppendStructuredBuffer<GrassBlade> grassBlades;
 Texture2D<float> heightTex;
 Texture2D<float4> normalMapTex;
+Texture2D<float> alphaMapTex;
 
 float4 frustumData[6];
 uint patternSize;
@@ -163,8 +164,11 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float h = heightTex.Load(int3(idX, idZ, 0)) * heightScale;
         worldPos.y = tileStartPosition.y + h;
 
+        // Reads the alpha map of the grass layer. Grass should only spawn on the grass layer
+        float alphaMap = alphaMapTex.Load(int3(idX, idZ, 0));
+
         // Last chance to make sure that blades outside the camera view don't need to be rendered
-        if (!isVisible(worldPos)) continue;
+        if (alphaMap < 0.75 || !isVisible(worldPos)) continue;
 
 
         // PART 3:
