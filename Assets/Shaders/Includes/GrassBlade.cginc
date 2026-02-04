@@ -9,7 +9,6 @@
 struct GrassBlade
 {
     float3 position;
-    float hash;
     float2 dimensions;
     float3 widthDir;
     float3 terrainNormal;
@@ -76,7 +75,6 @@ GrassBlade CreateGrassBlade(TestGrassBlade blade)
 
     newBlade.position = blade.position;
     newBlade.dimensions = float2(blade.width, blade.tilt);
-    newBlade.hash = .34982983f; // Doesn't matter in testing really
     newBlade.terrainNormal = float3(0,0,0); // Doesn't matter in testing
 
     

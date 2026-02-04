@@ -225,7 +225,6 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // Put together the struct for the blade and make sure it is visible
         GrassBlade blade;
         blade.position = worldPos;
-        blade.hash = rand(worldPos.zyx);
         blade.dimensions = float2(-.2f, bladeLength); // Tilt is the length (Which most closely follows arcLength)
         blade.widthDir = widthDir;
 

@@ -57,7 +57,6 @@ public class GrassBladeTest : MonoBehaviour
     private Matrix4x4[] instanceData;
     private Matrix4x4 t;
     private static readonly int BladeBuffer = Shader.PropertyToID("_BladeBuffer");
-    private static readonly int Hash = Shader.PropertyToID("hash");
     private static readonly int ArcLengthTBuffer = Shader.PropertyToID("_ArcLengthTBuffer");
     private static readonly int DValue = Shader.PropertyToID("LoDValue");
     private static readonly int LodTBuffer = Shader.PropertyToID("_LodTBuffer");
