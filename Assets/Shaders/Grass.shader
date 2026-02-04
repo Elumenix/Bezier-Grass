@@ -35,7 +35,7 @@ Shader "Custom/Grass"
 
         // All data for grass shape is stored on the cpu for efficiency rather than needing to be passed every frame
         // This also means that all instances of this shader share this data rather than every chunk/instance needing it's own version
-        static const half arcTBuffer[8] = { 0.001f, 0.4f, 0.6f, 0.7f, 0.8f, 0.88f, 0.95f, 1.0f };
+        static const half arcTBuffer[8] = { 0.001f, 0.28f, 0.47f, 0.6f, 0.71f, 0.85f, 0.94f, 1.0f };
         static const half lodTBuffer[8] = { 0.001f, 0.001f, 0.001f, 0.55f, 0.8f, 1.0f, 1.0f, 1.0f };
         static const half arcLODBuffer[4] = { 0.001f, 0.5f, 0.8f, 1.0f };
         StructuredBuffer<GrassBlade> grassBlades; // From the compute shader
@@ -99,8 +99,6 @@ Shader "Custom/Grass"
                 float3 pos;
                 float3 tangentVec;
                 CalculateBezierCurve(blade, t, pos, tangentVec);
-                //CalculateWindDisplacement(blade, t, pos, tangentVec);
-                tangentVec = normalize(tangentVec); // Was unnormalized to this point because it simplified math in wind displacement
             
                 // Blade will get skinnier the further up it goes, with the last one being along the center
                 float sideOffset = blade.dimensions.x - (blade.dimensions.x * t * t);
@@ -110,10 +108,10 @@ Shader "Custom/Grass"
                 pos += widthDir * sideOffset * odd;
 
                 // Normals are rounded so that the blades don't look as flat and reflect light better
-                float3 GeometricNormalOS = cross(tangentVec, widthDir);
+                float3 geometricNormalOS = cross(tangentVec, widthDir);
                 float normalizedWidth = sideOffset / blade.dimensions.x;
                 float3 roundingOffset = widthDir * -odd * normalizedWidth * _NormalCurvature;
-                float3 roundedNormal = normalize(GeometricNormalOS + roundingOffset);
+                float3 roundedNormal = normalize(geometricNormalOS + roundingOffset);
 
                 float3 terrainNormalOS = TransformWorldToObject(blade.terrainNormal);
                 float3 roundedTerrainNormal = normalize(terrainNormalOS + roundingOffset);

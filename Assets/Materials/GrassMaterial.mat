@@ -127,7 +127,7 @@ Material:
     - _SubsurfaceThickness: 0.218
     - _SubsurfaceWrap: 0.43
     - _Surface: 0
-    - _TerrainNormalAdjustment: 1
+    - _TerrainNormalAdjustment: 0
     - _Thickness: 0.1
     - _Translucency: 1
     - _ViewAdj: 0

@@ -99,13 +99,13 @@ Shader "Custom/GrassBladeTest"
                 o.positionCS = TransformWorldToHClip(positionWS);
                 o.positionWS = positionWS;
                 o.normalWS = normalize(TransformObjectToWorldNormal(roundedNormal));
+                o.terrainNormalWS = float3(0,1,0);
                 o.vertexID = vertex;
                 o.uv = float2(vertex == 14 ? .5 : vertex % 2, t);
             }
 
             half4 Fragment(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT_FACE_SEMANTIC) : SV_Target 
             {
-
                 half4 pbr = CalculateGrassLighting(input, isFrontFace);
                 return pbr;
                 // Set data needed to calculate lighting

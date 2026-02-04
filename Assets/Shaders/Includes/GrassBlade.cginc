@@ -80,26 +80,26 @@ GrassBlade CreateGrassBlade(TestGrassBlade blade)
     newBlade.terrainNormal = float3(0,0,0); // Doesn't matter in testing
 
     
-    float3 up = float3(0,1,0);
+    //float3 up = float3(0,1,0);
     float3 widthDir = float3(blade.facing.y, 0, -blade.facing.x); // Orthogonal normal to facing
-    float3 forwardDir = float3(blade.facing.x, 0, blade.facing.y); 
+    //float3 forwardDir = float3(blade.facing.x, 0, blade.facing.y); 
     
     float3 p0 = float3(0,0,0); // Root of the grass blade in object space.
 
-    float radius = blade.height / blade.bend;
-    float k = (4.0f / 3.0f) * tan(blade.bend / 4.0f);
+    float p3y = blade.tilt * blade.height;
+    float p3x = sqrt(blade.height * blade.height - p3y * p3y);
 
-    float2 P3_2D = float2(radius * sin(blade.bend), radius * (1.0f - cos(blade.bend)));
-    float2 P1_2D = k * radius * float2(1.0f, 0);
-    float2 P2_2D = P3_2D - k * radius * float2(cos(blade.bend), sin(blade.bend));
-
-    P1_2D = RotateVec2D(P1_2D, blade.tilt);
-    P2_2D = RotateVec2D(P2_2D, blade.tilt);
-    P3_2D = RotateVec2D(P3_2D, blade.tilt);
+    // Tip gets a bit closer to the base when the blade bends so that arc length is a bit more predictable
+    // Generally, this is just to make it not look like the blade grows and shrinks as it gets affected by wind
+    float bendPenalty = 1 - (blade.bend * blade.bend) / (blade.height * blade.height * 4);
+    float3 p3 = float3(p3x * blade.facing.x, p3y, p3x * blade.facing.y) * bendPenalty ; // Tip of the blade. Rotated to point in facing direction
         
-    float3 p1 = P1_2D.x * forwardDir + P1_2D.y * up;
-    float3 p2 = P2_2D.x * forwardDir + P2_2D.y * up;
-    float3 p3 = P3_2D.x * forwardDir + P3_2D.y * up;
+    float3 bladeDir = normalize(p3);
+    float3 awayDir = float3(0, bladeDir.y, 0);
+
+    // Towards the middle and away from the blade. Predominantly controls how bent the blade is
+    float3 p1 = p3 * .33f + awayDir * blade.bend * .5f;
+    float3 p2 = p3 * .66f + awayDir * blade.bend * .75f;
     
     float3 c0 = p0;                        // Offset
     float3 c1 = 3 * (p1 - p0);             // t
@@ -159,10 +159,8 @@ void CalculateBezierCurve(GrassBlade blade, float t, out float3 pos, out float3 
 
     // Similar mad operations are used again for the derivative point as an optimization
     float3 derivative = mad(mad(dc2, t, dc1), t, dc0);
-
-    // Not normalized because it simplifies the math in CalculateWindDisplacement
-    // If not calling that function, tangentVec should be immediately normalized before use
-    tangentVec = derivative;
+    
+    tangentVec = normalize(derivative);
 }
 
 // This is Deprecated currently and is now happening in the compute shader, where direct values of the grass shape

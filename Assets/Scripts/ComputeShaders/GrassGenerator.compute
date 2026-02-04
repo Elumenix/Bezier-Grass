@@ -204,7 +204,6 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // Get the four control points of the Cubic Bézier Curve that will determine the blades shape
         float3 p0 = float3(0,0,0); // Root of the grass blade in object space.
 
-        // Bézier curve math when we weren't using arcs for a better curve
         float p3y = bladeTilt * bladeLength;
         float p3x = sqrt(bladeLength * bladeLength - p3y * p3y);
 

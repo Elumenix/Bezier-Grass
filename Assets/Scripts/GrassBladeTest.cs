@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Serialization;
 using UnityEngine.UIElements;
 using static Unity.Mathematics.math;
 using float2 = Unity.Mathematics.float2;
@@ -23,8 +24,11 @@ public class GrassBladeTest : MonoBehaviour
 {
     public Material bladeMaterial;
     public float width = 1;
-    public float height = 3;
+    [FormerlySerializedAs("height")] [Range(0, 5.0f)]
+    public float length = 3;
+    [Range(0, 1.0f)]
     public float tilt = 3;
+    [Range(0, 3.0f)]
     public float bend = 1;
     public float2 facing;
     [Range(0, 1)] public float LODValue = 0;
@@ -84,7 +88,7 @@ public class GrassBladeTest : MonoBehaviour
         grassBladeData = new Mesh
         {
             vertices = new Vector3[15],
-            bounds = new Bounds(new Vector3(0, height - height / 4, 0), new Vector3(2, height*1.5f, 2)),
+            bounds = new Bounds(new Vector3(0, length - length / 4, 0), new Vector3(2, length*1.5f, 2)),
         };
         
         grassBladeData.SetIndices(new []
@@ -110,7 +114,7 @@ public class GrassBladeTest : MonoBehaviour
         if (grassBladeData != null)
         {
             // Bounds needs to be centered on the blade and fit both it's height and width, otherwise it will cull early
-            grassBladeData.bounds = new Bounds(new Vector3(0, height - height / 4, 0), new Vector3(2, height*1.5f, 2));
+            grassBladeData.bounds = new Bounds(new Vector3(0, length - length / 4, 0), new Vector3(2, length*1.5f, 2));
             UpdatePoints();
         }
     }
@@ -140,7 +144,7 @@ public class GrassBladeTest : MonoBehaviour
         {
             position = float3.zero,
             width = this.width,
-            height = this.height,
+            height = this.length,
             facing = this.facing,
             tilt = this.tilt,
             bend = this.bend,
@@ -182,42 +186,21 @@ public class GrassBladeTest : MonoBehaviour
     {
         facing = normalize(facing);
         p0.transform.position = Vector2.zero;
-        
-        
-        float radius = height / bend;
-        float k = (4.0f / 3.0f) * tan(bend / 4.0f);
-        float3 up = Vector3.up;
-        float3 forwardDir = float3(facing.x, 0, facing.y); 
 
-        float2 P3_2D = float2(radius * sin(bend), radius * (1.0f - cos(bend)));
-        float2 P1_2D = k * radius * float2(1.0f, 0);
-        float2 P2_2D = P3_2D - k * radius * float2(cos(bend), sin(bend));
+        float p3y = tilt * length;
+        float p3x = sqrt(length * length - p3y * p3y);
 
-        P1_2D = Rotate2D(P1_2D, tilt);
-        P2_2D = Rotate2D(P2_2D, tilt);
-        P3_2D = Rotate2D(P3_2D, tilt);
+        // Tip gets a bit closer to the base when the blade bends so that arc length is a bit more predictable
+        // Generally, this is just to make it not look like the blade grows and shrinks as it gets affected by wind
+        float bendPenalty = 1 - (bend * bend) / (length * length * 4);
+        p3.transform.position = float3(p3x * facing.x, p3y, p3x * facing.y) * bendPenalty ; // Tip of the blade. Rotated to point in facing direction
         
-        float3 localP1 = P1_2D.x * forwardDir + P1_2D.y * up;
-        float3 localP2 = P2_2D.x * forwardDir + P2_2D.y * up;
-        float3 localP3 = P3_2D.x * forwardDir + P3_2D.y * up;
+        float3 bladeDir = normalize(p3.transform.position);
+        float3 awayDir = float3(0, bladeDir.y, 0);
 
-        p1.transform.position = localP1;
-        p2.transform.position = localP2;
-        p3.transform.position = localP3;
-        
-        /*
-        // Endpoint is based on height and tilt
-        p3.transform.position = p0.transform.position + new Vector3(facing.x, 0, facing.y) * tilt + Vector3.up * height;
-        
-        // Above the starting point. How long until bending starts a lot more
-        p1.transform.position = p0.transform.position + Vector3.up * (height * bend);
-
-        Vector3 midPoint = 0.5f * (p3.transform.position - p0.transform.position);
-        Vector3 widthDir = new Vector3(facing.y, 0, -facing.x);
-        Vector3 bladeDir = normalize(p3.transform.position - p0.transform.position);
-        Vector3 awayDir = cross(-widthDir, bladeDir);
-
-        p2.transform.position = (p0.transform.position + midPoint) + awayDir * bend;*/
+        // Towards the middle and away from the blade. Predominantly controls how bent the blade is
+        p1.transform.position = (float3)(p3.transform.position * .33f) + (awayDir * bend * .5f);
+        p2.transform.position = (float3)(p3.transform.position * .66f) + (awayDir * bend * .75f);
     }
     
     float2 Rotate2D(float2 v, float angle)
