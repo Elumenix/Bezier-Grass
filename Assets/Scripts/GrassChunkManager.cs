@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Unity.Collections;
@@ -22,16 +21,16 @@ public class GrassChunkManager : MonoBehaviour
     public ComputeShader grassComputeShader;
     
     [Header("Grass Settings")]
-    [Range(1, 32)] public int chunksPerSide;
-    [Range(1, 200)] public float swapRange;
+    [Range(1, 32)] public int chunksPerSide = 8;
+    [Range(1, 200)] public float swapRange = 100;
     [SerializeField] private GrassShape grassShapeRange; 
     private static GrassShape grassShape;
     
     [Header("Grass Clump Settings")]
     [Range(1, 128)] public int patternSize;
-    [Range(0, 100)] public float scale = 32;
+    [Range(0, 100)] public float scale = 10;
     [Range(0, 1)] public float clumpSeparation = .15f;
-    [Range(0, 1)] public float clumpDirection = .15f;
+    [Range(0, 1)] public float clumpDirection = .51f;
     
     // Chunk management
     private GrassChunk[] activeChunks;
