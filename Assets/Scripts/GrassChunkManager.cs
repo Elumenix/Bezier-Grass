@@ -21,8 +21,8 @@ public class GrassChunkManager : MonoBehaviour
     public ComputeShader grassComputeShader;
     
     [Header("Grass Settings")]
-    [Range(1, 32)] public int chunksPerSide = 8;
-    [Range(1, 200)] public float swapRange = 100;
+    [Range(1, 48)] public int chunksPerSide = 8;
+    [Range(1, 500)] public float swapRange = 100;
     [SerializeField] private GrassShape grassShapeRange; 
     private static GrassShape grassShape;
     
