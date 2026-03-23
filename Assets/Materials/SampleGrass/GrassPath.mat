@@ -85,8 +85,8 @@ Material:
     m_Ints: []
     m_Floats:
     - _AddPrecomputedVelocity: 0
-    - _AdjustmentStrength: 0
-    - _AdjustmentThreshold: 0
+    - _AdjustmentStrength: 0.738
+    - _AdjustmentThreshold: 0.085
     - _AlphaClip: 0
     - _AlphaToMask: 0
     - _Ambient: 0.306
@@ -106,12 +106,12 @@ Material:
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
     - _GlossMapScale: 0
-    - _Glossiness: 0.468
+    - _Glossiness: 0.558
     - _GlossyReflections: 0
     - _GrassLOD: 1
     - _Metallic: 0
-    - _NormalCurvature: 0.064
-    - _Occlusion: 0.558
+    - _NormalCurvature: 0.724
+    - _Occlusion: 1
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueOffset: 0
@@ -127,7 +127,7 @@ Material:
     - _SubsurfaceThickness: 0.218
     - _SubsurfaceWrap: 0.43
     - _Surface: 0
-    - _TerrainNormalAdjustment: 0
+    - _TerrainNormalAdjustment: 0.06
     - _Thickness: 0.1
     - _Translucency: 1
     - _ViewAdj: 0
@@ -145,7 +145,7 @@ Material:
     m_Colors:
     - _Attenuation: {r: 0.2, g: 0.8, b: 0.3, a: 1}
     - _BaseColor: {r: 0.12923352, g: 0.8301887, b: 0.090067655, a: 1}
-    - _Color: {r: 0.27500895, g: 0.5660378, b: 0.27500895, a: 1}
+    - _Color: {r: 0.27500892, g: 0.5660378, b: 0.27500892, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _LodRange: {r: 25, g: 50, b: 0, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}

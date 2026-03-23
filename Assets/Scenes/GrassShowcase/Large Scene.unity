@@ -236,7 +236,7 @@ MonoBehaviour:
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
-  m_RenderPostProcessing: 0
+  m_RenderPostProcessing: 1
   m_Antialiasing: 0
   m_AntialiasingQuality: 2
   m_StopNaN: 0
@@ -692,6 +692,7 @@ MonoBehaviour:
   chunksPerSide: 48
   swapRange: 500
   grassShapeRange:
+    grassWidth: 0.2
     grassLength: 4.36
     tilt: 0.725
     bend: 1.17
@@ -755,8 +756,8 @@ MonoBehaviour:
   SplineOffset: {x: 0, y: 0, z: 0}
   CameraRotation: 4
   Damping:
-    Enabled: 0
-    Position: {x: 0, y: 0, z: 0}
+    Enabled: 1
+    Position: {x: 0.27, y: 0, z: 0}
     Angular: 0
   AutomaticDolly:
     Enabled: 0

@@ -107,7 +107,7 @@ public class GrassChunkManager : MonoBehaviour
         
         CreateTerrainMaps();
         
-        grassDesc = new GraphicsBuffer(Target.Constant, 1, sizeof(float) * 6);
+        grassDesc = new GraphicsBuffer(Target.Constant, 1, sizeof(float) * 7);
         grassDesc.SetData(new [] { grassShape });
         
         // This lasts for the life of the program, so it can be set now
@@ -216,6 +216,13 @@ public class GrassChunkManager : MonoBehaviour
 
     private void OnValidate()
     {
+        // This only sets when a new instance of the class is made in the unity editor
+        if (grassShapeRange is {grassLength: 0, grassWidth: 0, tilt: 0, bend: 0})
+        {
+            grassShapeRange = GrassShape.Default;
+        }
+        
+        // Save grass description for use
         if (grassDesc == null) return;
         grassDesc.SetData(new [] { grassShape });
         grassComputeShader.SetConstantBuffer(Shape, grassDesc, 0, 32);
@@ -406,10 +413,22 @@ public class GrassChunkManager : MonoBehaviour
 [StructLayout(LayoutKind.Sequential, Pack = 32)]
 public struct GrassShape
 {
+    [Range(0.01f, .5f)] public float grassWidth;
     [Range(0,5)] public float grassLength;
     [Range(0,1)] public float tilt;
     [Range(0,3f)] public float bend;
     [Range(0,5)] public float lengthVariance;
     [Range(0,.5f)] public float tiltVariance;
     [Range(0,.5f)] public float bendVariance;
+    
+    public static GrassShape Default => new GrassShape
+    {
+        grassWidth     = 0.2f,
+        grassLength    = 2.5f,
+        tilt           = 0.5f,
+        bend           = 0.5f,
+        lengthVariance = 0.2f,
+        tiltVariance   = 0.1f,
+        bendVariance   = 0.1f
+    };
 };

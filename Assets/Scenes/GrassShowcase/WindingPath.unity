@@ -306,7 +306,7 @@ MonoBehaviour:
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
-  m_RenderPostProcessing: 0
+  m_RenderPostProcessing: 1
   m_Antialiasing: 0
   m_AntialiasingQuality: 2
   m_StopNaN: 0
@@ -521,13 +521,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 829787400}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.9659258, z: -0.2588191, w: 0}
+  m_LocalRotation: {x: 0, y: 0.9389142, z: -0.34415138, w: 0}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 30, y: 180, z: 0}
+  m_LocalEulerAnglesHint: {x: 40.26, y: 180, z: 0}
 --- !u!1 &855733119
 GameObject:
   m_ObjectHideFlags: 0
@@ -565,16 +565,17 @@ MonoBehaviour:
   chunksPerSide: 14
   swapRange: 100
   grassShapeRange:
-    grassLength: 2.67
-    tilt: 0.6
-    bend: 1.85
-    lengthVariance: 1.3
-    tiltVariance: 0.146
-    bendVariance: 0.134
+    grassWidth: 0.1
+    grassLength: 2.54
+    tilt: 0.603
+    bend: 1.92
+    lengthVariance: 0.75
+    tiltVariance: 0.095
+    bendVariance: 0.125
   patternSize: 30
-  scale: 10
-  clumpSeparation: 0.125
-  clumpDirection: 0.514
+  scale: 5.6
+  clumpSeparation: 0
+  clumpDirection: 0.548
 --- !u!4 &855733121
 Transform:
   m_ObjectHideFlags: 0

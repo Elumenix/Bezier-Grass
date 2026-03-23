@@ -21,10 +21,10 @@ float swapRange;
 float3 tileStartPosition;
 float4 mapBounds; // Beginning xy, End zw
 float3 cameraPos;
-static const float3 up = float3(0,1,0);
 
 cbuffer GrassShape 
 {
+    float grassWidth;
     float grassLength;
     float tilt;
     float bend;
@@ -241,7 +241,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         // Put together the struct for the blade so that it can be sent to the draw shaders
         GrassBlade blade;
         blade.position = worldPos;
-        blade.dimensions = float2(-.2f, bladeLength); // Tilt is the length (Which most closely follows arcLength)
+        blade.dimensions = float2(-grassWidth, bladeLength); // bladeLength is the length (Which most closely follows arcLength)
         blade.widthDir = widthDir;
 
         // Terrain normal calculated so we can reduce antialiasing later

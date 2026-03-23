@@ -410,6 +410,7 @@ MonoBehaviour:
   chunksPerSide: 16
   swapRange: 115
   grassShapeRange:
+    grassWidth: 0.2
     grassLength: 2.6
     tilt: 0.43
     bend: 1.8

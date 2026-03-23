@@ -283,6 +283,7 @@ MonoBehaviour:
   chunksPerSide: 16
   swapRange: 100
   grassShapeRange:
+    grassWidth: 0.2
     grassLength: 3.16
     tilt: 0.722
     bend: 1.71
@@ -417,10 +418,10 @@ MonoBehaviour:
         z: 0
       Rotation:
         value:
-          x: 0.04890776
-          y: 0
-          z: -0.6121761
-          w: 0.7892074
+          x: 0.04890775
+          y: -0.0000000023601463
+          z: -0.61217606
+          w: 0.7892075
     m_MetaData:
     - Mode: 2
       Tension: 0.5

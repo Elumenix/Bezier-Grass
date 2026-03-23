@@ -85,8 +85,8 @@ Material:
     m_Ints: []
     m_Floats:
     - _AddPrecomputedVelocity: 0
-    - _AdjustmentStrength: 0.605
-    - _AdjustmentThreshold: 0.261
+    - _AdjustmentStrength: 0.464
+    - _AdjustmentThreshold: 0.113
     - _AlphaClip: 0
     - _AlphaToMask: 0
     - _Ambient: 0.306
@@ -110,7 +110,7 @@ Material:
     - _GlossyReflections: 0
     - _GrassLOD: 1
     - _Metallic: 0
-    - _NormalCurvature: 0.731
+    - _NormalCurvature: 0.591
     - _Occlusion: 1
     - _OcclusionStrength: 1
     - _Parallax: 0.005
@@ -127,7 +127,7 @@ Material:
     - _SubsurfaceThickness: 0.218
     - _SubsurfaceWrap: 0.43
     - _Surface: 0
-    - _TerrainNormalAdjustment: 0
+    - _TerrainNormalAdjustment: 0.437
     - _Thickness: 0.1
     - _Translucency: 1
     - _ViewAdj: 0
