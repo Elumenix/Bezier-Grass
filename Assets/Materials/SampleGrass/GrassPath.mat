@@ -106,12 +106,12 @@ Material:
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
     - _GlossMapScale: 0
-    - _Glossiness: 0.464
+    - _Glossiness: 0.468
     - _GlossyReflections: 0
     - _GrassLOD: 1
     - _Metallic: 0
-    - _NormalCurvature: 0.588
-    - _Occlusion: 1
+    - _NormalCurvature: 0.064
+    - _Occlusion: 0.558
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueOffset: 0
@@ -127,15 +127,15 @@ Material:
     - _SubsurfaceThickness: 0.218
     - _SubsurfaceWrap: 0.43
     - _Surface: 0
-    - _TerrainNormalAdjustment: 0.532
+    - _TerrainNormalAdjustment: 0
     - _Thickness: 0.1
     - _Translucency: 1
     - _ViewAdj: 0
     - _WindAmplitude: 8.1
-    - _WindDirection: 56
+    - _WindDirection: 64
     - _WindPower: 1.05
     - _WindScale: 0.133
-    - _WindSpeed: 4
+    - _WindSpeed: 4.21
     - _WorkflowMode: 1
     - _ZWrite: 1
     - adjustmentStrength: 0.758

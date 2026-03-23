@@ -137,6 +137,7 @@ Shader "Custom/Grass"
             half4 Fragment(Varyings input, FRONT_FACE_TYPE isFrontFace : FRONT_FACE_SEMANTIC) : SV_Target 
             {
                 half4 pbr = CalculateGrassLighting(input, isFrontFace);
+                pbr.rgb = min(pbr.rgb, 1.0); // Hdr clamp. blades, especially distant ones should not shine
                 return pbr;
             }
             ENDHLSL
